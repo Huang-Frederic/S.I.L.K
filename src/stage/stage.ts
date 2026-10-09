@@ -39,7 +39,6 @@ export const Z = {
   minions: 50,
   spider: 60,
   projectiles: 70,
-  blackout: 80,
   bubbles: 90,
   cursor: 100,
 } as const;

@@ -36,24 +36,23 @@ export function outcome(result: RaceResult, random: () => number = Math.random):
     const margin =
       diff > 0 ? `You beat the spider by ${plural(diff, 'hop')}.` : diff === 0 ? 'You beat the spider in as many hops.' : `You beat the spider, even with ${plural(-diff, 'more hop')}.`;
     const spiderNote = spider.retired ? ' The spider gave up.' : result.spiderOneAway ? ' It was one link away from the target.' : ' It was still crawling.';
-    const penalty = player.penaltyMs > 0 ? ` And that was with a +${Math.round(player.penaltyMs / 1000)} s penalty.` : '';
     if (difficulty.id === 'hard') {
       return {
         kind: 'impossible',
         title: 'IMPOSSIBLE.',
         tagline: '(screenshot this.)',
-        detail: `${margin}${spiderNote}${penalty} Hard mode wins in this browser: ${result.hardWins}.`,
+        detail: `${margin}${spiderNote} Hard mode wins in this browser: ${result.hardWins}.`,
         status: 'spider.status = deceased',
       };
     }
-    return { kind: 'win', title: 'You win.', detail: `${margin}${spiderNote}${penalty}`, status: 'spider.status = defeated' };
+    return { kind: 'win', title: 'You win.', detail: `${margin}${spiderNote}`, status: 'spider.status = defeated' };
   }
   if (result.gaveUp) {
     return { kind: 'gave-up', title: 'You gave up.', detail: GIVE_UP_ROASTS[Math.floor(random() * GIVE_UP_ROASTS.length)], status: 'spider.status = smug' };
   }
   if (race.winner === 'spider') {
     const roast = pickRoast(
-      { wordsEaten: result.wordsEaten, spiderHops: spider.hops, difficulty: difficulty.id, penaltyMs: player.penaltyMs, photoFinish: result.photoFinish && player.arrivedAt !== null },
+      { wordsEaten: result.wordsEaten, spiderHops: spider.hops, difficulty: difficulty.id, decoysClicked: result.decoysClicked, snatched: result.snatched },
       random,
     );
     return { kind: 'lose', title: 'Spider wins.', detail: roast, status: 'spider.status = victorious' };
@@ -65,7 +64,7 @@ export function outcome(result: RaceResult, random: () => number = Math.random):
 export function pathsText(result: RaceResult, verdict: Outcome): string {
   const { race } = result;
   const line = (who: string, state: Race['player']) =>
-    `${who} (${plural(state.hops, 'hop')}${state.finishedAt !== null ? `, ${formatClock(state.finishedAt)}` : ''}): ${state.path.map((s) => (s.via === 'swap' ? `[swap] ${s.title}` : s.title)).join(' → ')}`;
+    `${who} (${plural(state.hops, 'hop')}${state.arrivedAt !== null ? `, ${formatClock(state.arrivedAt)}` : ''}): ${state.path.map((s) => (s.via === 'swap' ? `[swap] ${s.title}` : s.title)).join(' → ')}`;
   return [
     `S.I.L.K · ${race.startTitle} → ${race.targetTitle} · ${result.difficulty.label}`,
     `${verdict.title}${verdict.tagline ? ` ${verdict.tagline}` : ''}`,
@@ -88,9 +87,9 @@ export function createFinishScreen(options: FinishScreenOptions): HTMLElement {
   const playerWon = race.winner === 'player';
 
   const timeCard = playerWon
-    ? card('Your time', formatClock(race.player.finishedAt ?? 0), 'is-time', race.player.penaltyMs > 0 ? `incl. +${Math.round(race.player.penaltyMs / 1000)} s penalty` : undefined)
-    : race.spider.finishedAt !== null
-      ? card('Spider time', formatClock(race.spider.finishedAt), 'is-spider')
+    ? card('Your time', formatClock(race.player.arrivedAt ?? 0), 'is-time')
+    : race.spider.arrivedAt !== null
+      ? card('Spider time', formatClock(race.spider.arrivedAt), 'is-spider')
       : card('Race time', formatClock(race.clock.elapsed()), 'is-time');
 
   const copyBtn = h('button', { class: 'btn-link', text: 'Copy both paths', attrs: { type: 'button' } });
@@ -153,14 +152,8 @@ export function createFinishScreen(options: FinishScreenOptions): HTMLElement {
   return element;
 }
 
-function card(label: string, value: string, className: string, note?: string): HTMLElement {
-  return h(
-    'div',
-    { class: `stat-card ${className}` },
-    h('span', { class: 'stat-label', text: label }),
-    h('strong', { class: 'stat-value', text: value }),
-    note ? h('span', { class: 'stat-note', text: note }) : null,
-  );
+function card(label: string, value: string, className: string): HTMLElement {
+  return h('div', { class: `stat-card ${className}` }, h('span', { class: 'stat-label', text: label }), h('strong', { class: 'stat-value', text: value }));
 }
 
 const NOTE_TAGS: Record<string, string> = {

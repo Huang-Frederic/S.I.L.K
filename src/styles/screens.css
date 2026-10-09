@@ -563,11 +563,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.hud-penalty {
-  color: var(--red);
-  font: 600 14px var(--font-mono);
-}
-
 .hud-difficulty {
   padding: 9px 12px;
   border: 1px solid var(--border-2);
@@ -884,35 +879,6 @@
   }
 }
 
-/* Photo finish: the player's penalty keeps the race open. */
-.photo-finish {
-  position: absolute;
-  top: 70px;
-  left: 50%;
-  z-index: 6;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 14px 22px;
-  border: 1px solid var(--red);
-  background: rgba(11, 14, 18, 0.94);
-  transform: translateX(-50%);
-  white-space: nowrap;
-}
-
-.photo-finish strong {
-  color: var(--red);
-  font: 700 22px var(--font-mono);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.photo-count {
-  color: var(--ink-2);
-  font: 400 13px var(--font-mono);
-}
-
 /* Loading checklist and countdown */
 .race-overlay {
   position: absolute;
@@ -1113,11 +1079,6 @@
 
 .stat-card.is-spider .stat-value {
   color: var(--red);
-}
-
-.stat-note {
-  color: var(--red);
-  font: 400 12px var(--font-mono);
 }
 
 .finish-paths {

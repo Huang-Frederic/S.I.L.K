@@ -29,11 +29,12 @@ system asks for it) removes screen shake and shortens transitions; it never chan
 | Level | What the spider does |
 | --- | --- |
 | **Easy** | Thinks slowly, crawls, and destroys its own page. Never touches yours. Winnable. |
-| **Normal** | Adds a **web trap** (links near your cursor can't be clicked for a few seconds), a **laser snipe** (burns the link you are reaching for) and a **word bombardment** (words from its page land on your links and cover them), about every 25 s. **Rage** when your page links to the target: faster, angrier, glowing eye. Hard but winnable. |
-| **Hard** | Everything, every 4–8 s, chained (web, then laser the only free link, then eggs…), with no warning, rage always on, near-instant thinking, and it sprints across the page smashing the text. **Link snatch**: when your cursor gets within ~120 px of a link, it may leap across, eat it, wiggle, dive in, and the panes swap owners: you continue from its page. **Decoys**: up to 3 fake target links in your text, +15 s each (arriving with a penalty starts a photo finish the spider can still win). **Eggs** hatch in 3 s into mini-spiders that eat the link nearest your cursor. **Blackout**: 6 s of darkness with a shrinking flashlight. **Cursor harassment**: a silk line sticks to your cursor and drags it for 2 s. Expected win rate: almost zero. |
+| **Normal** | Adds a **web trap** (links near your cursor can't be clicked for a few seconds), the **fan laser** (a big beam from its eye sweeps a fan across your page, centred on your cursor, and burns every word and link it passes over, its own page included) and a **word bombardment** (words from its page land on your links and cover them), about every 25 s. **Rage** when your page links to the target: faster, angrier, glowing eye, attacks twice as often. Hard but winnable. |
+| **Hard** | An attack every 4–8 s, chained (web, then the fan laser, then a bombardment…), with no warning, rage always on, near-instant thinking, and it sprints across the page smashing the text. **Decoys**: up to 3 fake target links in your text; click one and it bursts into mini-spiders that run for the links nearest your cursor and eat them (no time lost). **Cursor harassment**, now and then (at most once every 45 s): a silk line sticks to your cursor and drags it for 2 s. **Link snatch**, once a race: when you click a link that would put you ahead (the target, or a page that links to it, while the spider is further away), it leaps across, eats that link, dives in, and the panes swap owners: you continue from its page. Never on your first three links, never in the first minute. Expected win rate: almost zero. |
 
 Hard is meant as a show, not a fair fight: people should lose, laugh, and share the clip. The spider
-may burn, web or cover the target link and may leave you with nothing clickable for a while. The
+may burn, web or cover the target link and may leave you with nothing clickable for a while. There are
+no time penalties: the first one on the target wins. The
 spider taunts you in short speech bubbles (at most one every ~6 s), celebrates a win by walking to
 the middle of the screen, eating your **YOU** badge and dancing, and roasts you on the lose screen
 with the race's real numbers. Beat it on Hard and it collapses, its eye flickers out, and the finish
@@ -103,15 +104,19 @@ the link snatch's pane swap possible. The stage runs one frame loop; animations 
 coordinates keeps effects glued to the text while it scrolls; airborne moves (leaps, the victory walk)
 use stage coordinates and cross the gutter freely.
 
-Words are wrapped in spans lazily, only near the spider (`WordIndex`), so long articles stay light.
-Destroyed words keep their box (dashed outline, strike-through, 20 % ink, a dashed hole for thrown
-words, a squashed glyph for stomped ones), so the text never reflows under the player's cursor.
+Words are wrapped in spans lazily, only near the spider or under the fan laser (`WordIndex`), so long
+articles stay light. Destroyed words keep their box (dashed outline, strike-through, 20 % ink, a
+dashed hole for thrown words, a squashed glyph for stomped or crushed ones, red embers for burned
+ones), so the text never reflows under the player's cursor.
 
 ### The spider (`src/spider/rig.ts`, `actor.ts`, `runner.ts`)
 
 The rig follows the mockups' rig sheet: a plain outlined body with one red eye, eight 1.5 px legs
 placed by two-bone inverse kinematics, feet that snap to words (each planted foot boxes its word in
-cyan) and re-plant past 90 % stretch in a strict tetrapod gait. One hop is:
+cyan) and re-plant past 90 % stretch in a tetrapod gait. The body turns to face where it goes (the eye
+leads, and it drops into a page head first), sways with its stride, and every step is a little
+different. Each leg owns an angular sector around the body, so legs never pass over or under each
+other, even in a U-turn at a run. A foot landing on a word may crush it. One hop is:
 
 1. **scan**: rays from the eye to every visible link while the brain decides; the SPIDER.BRAIN panel
    shows the best scores;
@@ -126,7 +131,8 @@ cyan) and re-plant past 90 % stretch in a strict tetrapod gait. One hop is:
 
 The runner plays the agent's decisions with these moves and prefetches the next page while the spider
 crawls. Attacks (`src/attacks/`) are small coroutines picked by a director with cooldowns, chains and
-rage; the link snatch interrupts the hop loop.
+rage. The link snatch answers a click of the player's (its rules are a pure, tested module,
+`src/game/snatch.ts`) and interrupts the hop loop.
 
 All art (spider, effects, illustrations, logo, favicon) is drawn in code; there are no image assets
 and no bundled fonts (the mockups' fonts, Space Grotesk, Source Serif 4 and JetBrains Mono, are used
@@ -161,12 +167,12 @@ src/
   config.ts               URLs, user agent, request limits
   settings.ts             Reduce motion, Hard-mode wins (localStorage, guarded)
   wiki/                   HTTP queue, API client, sanitizer, article cache, titles
-  game/                   race rules (penalties, photo finish), clock, difficulty table,
+  game/                   race rules, link-snatch rules, clock, difficulty table,
                           pair selection, taunts and roasts
   spider/ai/              decision rules, rankers, embeddings worker, agent (pure, tested)
   spider/                 rig (IK body), actor (moves), runner (hop loop), route, world
   stage/                  full-window stage, role-agnostic panes, word index, virtual cursor
-  attacks/                web, laser, bombardment, decoys, blackout, harassment, eggs, director
+  attacks/                web, fan laser, bombardment, decoys and mini-spiders, harassment, director
   fx/                     line-art effects, RGB-split glitches, speech bubble
   ui/                     title (demo, illustrations), race, finish screens, widgets
   styles/                 design tokens, article typography, screens

@@ -42,7 +42,7 @@ describe('taunts', () => {
 });
 
 describe('roasts', () => {
-  const facts = { wordsEaten: 2318, spiderHops: 7, difficulty: 'hard' as const, penaltyMs: 0, photoFinish: false };
+  const facts = { wordsEaten: 2318, spiderHops: 7, difficulty: 'hard' as const, decoysClicked: 0, snatched: false };
 
   it('uses the real numbers of the race', () => {
     const lines = roastLines(facts);
@@ -61,25 +61,31 @@ describe('roasts', () => {
   it('teases an Easy loss', () => {
     expect(roastLines({ ...facts, difficulty: 'easy' })).toContain('Lost on Easy. The spider is telling everyone.');
   });
+
+  it('never mentions time penalties (there are none)', () => {
+    for (const line of roastLines({ ...facts, decoysClicked: 2, snatched: true })) expect(line).not.toMatch(/penalty|\+\d+ s/);
+  });
 });
 
 describe('difficulty table', () => {
-  it('matches the design: Easy never attacks, Normal has three attacks, Hard has everything', () => {
+  it('matches the design: Easy never attacks, Normal has three attacks, Hard has five', () => {
     expect(DIFFICULTIES.easy.attacks).toEqual([]);
     expect(DIFFICULTIES.easy.snatch).toBeNull();
     expect(DIFFICULTIES.easy.rage).toBe('never');
-    expect(DIFFICULTIES.normal.attacks.sort()).toEqual(['bombard', 'laser', 'web']);
+    expect([...DIFFICULTIES.normal.attacks].sort()).toEqual(['bombard', 'laser', 'web']);
+    expect(DIFFICULTIES.normal.snatch).toBeNull();
     expect(DIFFICULTIES.normal.cooldown[0]).toBeGreaterThanOrEqual(20);
     expect(DIFFICULTIES.normal.cooldown[1]).toBeLessThanOrEqual(30);
-    expect(DIFFICULTIES.hard.attacks.length).toBe(7);
+    expect([...DIFFICULTIES.hard.attacks].sort()).toEqual(['bombard', 'decoy', 'harass', 'laser', 'web']);
     expect(DIFFICULTIES.hard.cooldown).toEqual([4, 8]);
     expect(DIFFICULTIES.hard.rage).toBe('always');
-    expect(DIFFICULTIES.hard.snatch).toEqual({ radius: 120, cooldown: 8 });
-    expect(DIFFICULTIES.hard.blackoutSeconds).toBe(6);
-    expect(DIFFICULTIES.hard.hatchSeconds).toBe(3);
+    // Link snatch: never on the first 3 links, once a race, not in the first minute.
+    expect(DIFFICULTIES.hard.snatch).toEqual({ safeHops: 3, perRace: 1, cooldown: 60 });
     expect(DIFFICULTIES.hard.harassSeconds).toBe(2);
+    expect(DIFFICULTIES.hard.harassGap).toBeGreaterThanOrEqual(40);
     expect(DIFFICULTIES.hard.maxDecoys).toBe(3);
-    expect(DIFFICULTIES.hard.decoyPenaltyMs).toBe(15_000);
+    expect(DIFFICULTIES.hard.decoyMinis).toBeGreaterThan(0);
+    expect(DIFFICULTIES.hard.laserFan).toBeGreaterThan(DIFFICULTIES.normal.laserFan);
   });
 
   it('gets faster with each level', () => {

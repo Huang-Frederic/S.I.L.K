@@ -16,9 +16,6 @@ export type TauntEvent =
   | 'bombard'
   | 'decoy-planted'
   | 'decoy-clicked'
-  | 'eggs'
-  | 'hatch'
-  | 'blackout'
   | 'harass'
   | 'blocked-click'
   | 'player-slow'
@@ -34,13 +31,10 @@ export const TAUNTS: Record<TauntEvent, string[]> = {
   'snatch-target': ['you were so close.', 'mine now.', 'so close. not.'],
   'player-near-target': ['you were so close.', 'don’t even think about it.'],
   web: ['stuck?', 'sticky situation.'],
-  laser: ['pew.', 'denied.', 'not that one.'],
+  laser: ['pew.', 'denied.', 'everything burns.', 'crispy.'],
   bombard: ['incoming.', 'catch.', 'have some words.'],
   'decoy-planted': ['click me.', 'trust me.'],
-  'decoy-clicked': ['gotcha.', '+15 s. lol.', 'that was fake.'],
-  eggs: ['say hi to the kids.', 'they’re hungry.'],
-  hatch: ['nom.', 'feeding time.'],
-  blackout: ['lights out.', 'can’t click what you can’t see.'],
+  'decoy-clicked': ['gotcha.', 'say hi to the kids.', 'they’re hungry.', 'that was a nest.'],
   harass: ['let me help.', 'this way.', 'wrong way.'],
   'blocked-click': ['skill issue.', 'nope.'],
   'player-slow': ['too slow.', 'tick tock.', 'reading the whole thing?'],
@@ -83,10 +77,10 @@ export interface RoastFacts {
   wordsEaten: number;
   spiderHops: number;
   difficulty: 'easy' | 'normal' | 'hard';
-  /** The player's penalties in ms (decoys). */
-  penaltyMs: number;
-  /** The spider beat a pending photo finish. */
-  photoFinish: boolean;
+  /** Fake links the player clicked. */
+  decoysClicked: number;
+  /** The spider stole the player's link. */
+  snatched: boolean;
 }
 
 /** Lose-screen roast lines, built from real numbers of the race. */
@@ -102,8 +96,8 @@ export function roastLines(facts: RoastFacts): string[] {
   ];
   if (facts.difficulty === 'easy') lines.push('Lost on Easy. The spider is telling everyone.');
   if (facts.difficulty === 'hard') lines.push('You were so close. (You weren’t.)');
-  if (facts.penaltyMs > 0) lines.push(`You clicked a fake link. The spider is still laughing.`);
-  if (facts.photoFinish) return [`Photo finish. The +${Math.round(facts.penaltyMs / 1000)} s penalty did you in.`];
+  if (facts.decoysClicked > 0) lines.push('You clicked a fake link. The babies say thanks.');
+  if (facts.snatched) lines.push('It stole your best link. And your race.');
   return lines;
 }
 

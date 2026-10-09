@@ -60,6 +60,14 @@ describe('RacerPane', () => {
     expect(road.classList.contains('is-webbed')).toBe(false);
     expect(pane.usable(printing)).toBe(false);
 
+    // A webbed link that gets burned looks burned, not webbed.
+    pane.damageLink(paper, 'webbed', 10);
+    pane.damageLink(paper, 'burned');
+    expect(paper.classList.contains('is-webbed')).toBe(false);
+    expect(paper.classList.contains('is-burned')).toBe(true);
+    pane.expireDamage(20);
+    expect(pane.usable(paper)).toBe(false);
+
     // A new article starts clean.
     const generation = pane.generation;
     pane.showArticle(loaded('Paper', link('Silk')));

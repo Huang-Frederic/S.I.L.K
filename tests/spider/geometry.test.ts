@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { inTriangle, rayExit } from '../../src/attacks/attacks';
 import type { Box } from '../../src/stage/stage';
 import { segmentHitsBox } from '../../src/spider/actor';
 import { solveKnee } from '../../src/spider/rig';
@@ -96,5 +97,30 @@ describe('segmentHitsBox (eye laser cuts)', () => {
   it('misses words beside the beam or beyond its end', () => {
     expect(segmentHitsBox({ x: 0, y: 0 }, { x: 300, y: 0 }, word)).toBe(false);
     expect(segmentHitsBox({ x: 0, y: 0 }, { x: 80, y: 90 }, word)).toBe(false);
+  });
+});
+
+describe('fan laser geometry', () => {
+  const pane = { left: 0, top: 0, right: 600, bottom: 800 };
+
+  it('runs the beam to the far side of the player pane', () => {
+    // From the spider's pane on the right, straight left: it leaves the pane at x = 0.
+    expect(rayExit({ x: 900, y: 400 }, { x: -1, y: 0 }, pane)).toBeCloseTo(900);
+    // Steeply downwards: it leaves through the bottom edge.
+    const dir = { x: -Math.SQRT1_2, y: Math.SQRT1_2 };
+    const t = rayExit({ x: 700, y: 500 }, dir, pane)!;
+    expect(500 + dir.y * t).toBeCloseTo(800);
+    // Pointing away from the pane: no hit.
+    expect(rayExit({ x: 900, y: 400 }, { x: 1, y: 0 }, pane)).toBeNull();
+  });
+
+  it('burns what the sweep passes over', () => {
+    const eye = { x: 900, y: 400 };
+    const a = { x: 0, y: 300 };
+    const b = { x: 0, y: 500 };
+    expect(inTriangle({ x: 300, y: 400 }, eye, a, b)).toBe(true);
+    expect(inTriangle({ x: 300, y: 400 }, eye, b, a)).toBe(true);
+    expect(inTriangle({ x: 300, y: 200 }, eye, a, b)).toBe(false);
+    expect(inTriangle({ x: 950, y: 400 }, eye, a, b)).toBe(false);
   });
 });

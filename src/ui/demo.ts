@@ -90,11 +90,10 @@ export class TitleDemo {
       return { left: t.left - r.left, top: t.top - r.top, right: t.right - r.left, bottom: t.bottom - r.top };
     };
     const ground = {
-      hold: (desired: Point): Foothold => {
-        const word = words.nearest(desired, rig.reach * 0.3);
-        if (!word) return { point: desired, word: null };
-        const b = word.box;
-        return { point: { x: Math.min(Math.max(desired.x, b.left + 3), b.right - 3), y: b.top + (b.bottom - b.top) * 0.62 }, word };
+      hold: (desired: Point, accept?: (p: Point) => boolean): Foothold => {
+        const on = (b: Box) => ({ x: Math.min(Math.max(desired.x, b.left + 3), b.right - 3), y: b.top + (b.bottom - b.top) * 0.62 });
+        const word = words.nearest(desired, rig.reach * 0.3, (w) => !w.gone && (!accept || accept(on(w.box))));
+        return word ? { point: on(word.box), word } : { point: desired, word: null };
       },
     };
     let rays: Array<{ to: Point; age: number }> = [];
@@ -172,6 +171,7 @@ export class TitleDemo {
       lock = target;
       laser = 0.45;
       rig.lookAt = center(target.box);
+      rig.face({ x: center(target.box).x - rig.x, y: center(target.box).y - rig.y });
       this.hud.state.textContent = 'LOCKED';
       this.hud.state.className = 'demo-state is-lock';
       await stage.wait(0.6);
@@ -191,6 +191,7 @@ export class TitleDemo {
         const step = Math.min(d, Math.max(18, Math.min(speed, d * 4)) * dt);
         rig.x += (dx / d) * step;
         rig.y += (dy / d) * step;
+        rig.face({ x: dx, y: dy });
       }
 
       // Eat.

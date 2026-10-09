@@ -2,12 +2,17 @@
  * The spider rig: procedural, line-drawn, legs placed by inverse kinematics
  * on the real text.
  *
- *  - Body: a plain outlined rectangle (always upright) with one red eye dot.
+ *  - Body: a plain outlined rectangle with one red eye dot. It turns to face
+ *    where it goes (the eye leads), and sways a little as it walks.
  *  - Legs: 1.5 px strokes, 2 px knee dots, 3 px foot rings; reach ~3 lines.
+ *  - Each leg owns an angular sector around the body, so legs never cross:
+ *    a foot only lands inside its sector, and a foot the body has turned
+ *    away from steps at once.
  *  - Feet snap to words (via a Ground) and each planted foot boxes its word
  *    in cyan. A foot re-plants when stretched past 90 % of its reach, or when
  *    it falls too far behind; legs step in an alternating tetrapod gait
- *    (L1 R2 L3 R4 / R1 L2 R3 L4).
+ *    (L1 R2 L3 R4 / R1 L2 R3 L4), each step a little different, the foot
+ *    swinging out in an arc.
  *  - Poses: stand (walk / idle breathing), hang, grab (legs wrap a link),
  *    dance, collapse; plus a wiggle and a carried word for throws.
  *
@@ -23,9 +28,9 @@ export interface Foothold {
   word: Word | null;
 }
 
-/** Decides where a foot lands. */
+/** Decides where a foot lands. `accept` filters the candidate points. */
 export interface Ground {
-  hold(desired: Point): Foothold;
+  hold(desired: Point, accept?: (point: Point) => boolean): Foothold;
 }
 
 /** Ground for open space (no words to grab). */
@@ -55,6 +60,8 @@ interface Leg {
   /** Step progress (1 = planted). */
   t: number;
   duration: number;
+  /** How far the foot swings out mid-step (px). */
+  arc: number;
   word: Word | null;
 }
 
@@ -65,15 +72,31 @@ const TIBIA = 56;
 const REACH = FEMUR + TIBIA;
 const REST = REACH * 0.85;
 const HIP_Y = [-15, -5, 5, 15];
-/** Resting directions for the right legs (screen space, y down); left mirrors. */
+/** Resting directions for the right legs (body space, y down); left mirrors. */
 const ANGLES = [-62, -20, 20, 62].map((d) => (d * Math.PI) / 180);
+/** Each leg's sector around the body (right side, body space): legs never cross. */
+const SECTORS: Array<[number, number]> = [
+  [-86, -44],
+  [-38, -4],
+  [4, 38],
+  [44, 86],
+].map(([a, b]) => [(a * Math.PI) / 180, (b * Math.PI) / 180]);
+/** How fast the body turns towards where it goes (rad/s); in the air it twists faster. */
+const TURN_RATE = 9;
+const AIR_TURN_RATE = 20;
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+/** Angle wrapped to [-pi, pi]. */
+const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
 export class SpiderRig {
   x = 0;
   y = 0;
   size = 1;
   scale = 1;
+  /** Body rotation (0: upright, eye up). It turns towards `targetTilt`. */
   tilt = 0;
+  targetTilt = 0;
   fold = 0;
   pose: Pose = 'stand';
   grounded = false;
@@ -88,6 +111,11 @@ export class SpiderRig {
   visible = true;
   /** Seconds, drives breathing, dancing and blinking. */
   time = 0;
+  /**
+   * Called when a foot lands on a word; returns true when it crushed the
+   * word (the foot then holds nothing).
+   */
+  onPlant: ((word: Word) => boolean) | null = null;
 
   private readonly legs: Leg[] = [];
   private lastX = 0;
@@ -97,6 +125,9 @@ export class SpiderRig {
   private wiggleUntil = 0;
   /** Which leg group lifts next (tetrapod gait). */
   private turn = 0;
+  /** Walk cycle, drives the body's sway. */
+  private stride = 0;
+  private sway: Point = { x: 0, y: 0 };
 
   constructor(size = 1) {
     this.size = size;
@@ -113,6 +144,7 @@ export class SpiderRig {
           to: { x: 0, y: 0 },
           t: 1,
           duration: 0.1,
+          arc: 0,
           word: null,
         });
       }
@@ -158,6 +190,22 @@ export class SpiderRig {
     }));
   }
 
+  /** Turns the body to face a direction (the eye leads). */
+  face(direction: Point): void {
+    if (Math.hypot(direction.x, direction.y) < 1e-6) return;
+    this.targetTilt = Math.atan2(direction.y, direction.x) + Math.PI / 2;
+  }
+
+  /** True once the body has finished turning towards its heading. */
+  get facing(): boolean {
+    return Math.abs(wrap(this.targetTilt - this.tilt)) < 0.06;
+  }
+
+  /** Feet as drawn (each inside its own sector, never longer than the leg). */
+  feet(): Point[] {
+    return this.legs.map((leg) => this.drawnFoot(leg, leg.foot));
+  }
+
   /** Words currently under a planted foot. */
   heldWords(): Word[] {
     return this.legs.filter((l) => l.t >= 1 && l.word && !l.word.gone).map((l) => l.word!);
@@ -176,7 +224,7 @@ export class SpiderRig {
   plantAll(ground: Ground): void {
     this.grounded = true;
     for (const leg of this.legs) {
-      const hold = ground.hold(this.restFoot(leg, { x: 0, y: 0 }));
+      const hold = this.holdFor(leg, this.restFoot(leg, { x: 0, y: 0 }), ground);
       leg.foot = leg.from = leg.to = hold.point;
       leg.word = hold.word;
       leg.t = 1;
@@ -206,6 +254,19 @@ export class SpiderRig {
     this.lastX = this.x;
     this.lastY = this.y;
 
+    // Turn towards the target heading at a bounded rate.
+    const turn = wrap(this.targetTilt - this.tilt);
+    const rate = (this.grounded ? TURN_RATE : AIR_TURN_RATE) * dt;
+    this.tilt = wrap(this.tilt + clamp(turn, -rate, rate));
+
+    // A walking body sways from side to side with its stride.
+    const speed = Math.hypot(this.vx, this.vy);
+    const walking = this.grounded && this.pose === 'stand';
+    this.stride += (speed * dt) / 42;
+    const amp = walking ? 2.2 * this.size * Math.min(1, speed / 90) : 0;
+    const side = Math.sin(this.stride * Math.PI);
+    this.sway = { x: Math.cos(this.tilt) * side * amp, y: Math.sin(this.tilt) * side * amp };
+
     if (this.pose === 'grab' && this.grabBox) {
       this.placeAround(this.grabBox, dt);
       return;
@@ -225,12 +286,19 @@ export class SpiderRig {
       return;
     }
 
-    // Steps in progress.
+    // Steps in progress: the foot swings out in an arc on its way.
     for (const leg of this.legs) {
       if (leg.t >= 1) continue;
       leg.t = Math.min(1, leg.t + dt / leg.duration);
       const e = leg.t * leg.t * (3 - 2 * leg.t);
-      leg.foot = { x: leg.from.x + (leg.to.x - leg.from.x) * e, y: leg.from.y + (leg.to.y - leg.from.y) * e };
+      const out = { x: leg.to.x - this.x, y: leg.to.y - this.y };
+      const len = Math.hypot(out.x, out.y) || 1;
+      const swing = Math.sin(leg.t * Math.PI) * leg.arc;
+      leg.foot = {
+        x: leg.from.x + (leg.to.x - leg.from.x) * e + (out.x / len) * swing,
+        y: leg.from.y + (leg.to.y - leg.from.y) * e + (out.y / len) * swing,
+      };
+      if (leg.t >= 1 && leg.word && this.onPlant?.(leg.word)) leg.word = null;
     }
     if (this.pose === 'dance') return;
 
@@ -238,7 +306,6 @@ export class SpiderRig {
     // leg of it stretched past 90 % or left behind), then the turn passes.
     // Walking, nothing lifts while a foot is in the air; running, the next
     // group may lift once the airborne feet are most of the way there.
-    const speed = Math.hypot(this.vx, this.vy);
     const overlap = speed > 220 ? 0.55 : 1;
     if (this.legs.some((leg) => leg.t < overlap)) return;
     if (overlap < 1 && this.legs.some((leg) => leg.t < 1 && leg.group === this.turn)) return;
@@ -251,7 +318,9 @@ export class SpiderRig {
       const ideal = this.restFoot(leg, lead);
       const stretch = Math.hypot(leg.foot.x - hip.x, leg.foot.y - hip.y) / reach;
       const away = Math.hypot(leg.foot.x - ideal.x, leg.foot.y - ideal.y);
-      return { ideal, value: Math.max(stretch / 0.9, away / (0.3 * reach), leg.word?.gone ? 2 : 0) };
+      // A foot the body has turned away from (outside its sector) must move.
+      const misplaced = this.inSector(leg, leg.foot, 0.04) ? 0 : 2;
+      return { ideal, value: Math.max(stretch / 0.9, away / (0.3 * reach), leg.word?.gone ? 2 : 0, misplaced) };
     };
     const scored = this.legs.map((leg) => ({ leg, ...urgency(leg) }));
     const due = (group: number) => scored.filter((s) => s.leg.group === group);
@@ -262,15 +331,26 @@ export class SpiderRig {
     }
     for (const { leg, ideal, value } of due(group)) {
       if (leg.t < 1 || value < 0.55) continue; // still landing, or nearly in place
-      const hold = ground.hold(ideal);
+      const hold = this.holdFor(leg, ideal, ground);
       const distance = Math.hypot(hold.point.x - leg.foot.x, hold.point.y - leg.foot.y);
       leg.from = { ...leg.foot };
       leg.to = hold.point;
       leg.word = hold.word;
-      leg.duration = Math.max(0.04, Math.min(0.18, distance / Math.max(260, speed * 4)));
+      // No two steps quite alike.
+      const jitter = 0.85 + Math.random() * 0.3;
+      leg.duration = Math.max(0.04, Math.min(0.2, (distance / Math.max(260, speed * 4)) * jitter));
+      leg.arc = (3 + Math.random() * 6) * this.size;
       leg.t = 0;
     }
     this.turn = 1 - group;
+  }
+
+  /** A foothold for a leg, inside its own sector. */
+  private holdFor(leg: Leg, desired: Point, ground: Ground): Foothold {
+    const ideal = this.clampToSector(leg, desired);
+    const hold = ground.hold(ideal, (p) => this.inSector(leg, p));
+    if (this.inSector(leg, hold.point, 0.02)) return hold;
+    return { point: this.clampToSector(leg, hold.point), word: null };
   }
 
   // ------------------------------------------------------------------ poses
@@ -310,17 +390,65 @@ export class SpiderRig {
 
   // --------------------------------------------------------------- geometry
 
+  /** Where a foot would rest, shifted by `lead`, but never beyond 90 % of the reach. */
   private restFoot(leg: Leg, lead: Point): Point {
     const hip = this.toWorld(leg.hip);
     const r = REST * this.size * this.scale * (1 - 0.62 * this.fold);
-    return { x: hip.x + Math.cos(leg.angle) * r + lead.x, y: hip.y + Math.sin(leg.angle) * r + lead.y };
+    const a = leg.angle + this.tilt;
+    const p = { x: hip.x + Math.cos(a) * r + lead.x, y: hip.y + Math.sin(a) * r + lead.y };
+    const max = 0.9 * this.reach;
+    const d = Math.hypot(p.x - hip.x, p.y - hip.y);
+    return d > max ? { x: hip.x + ((p.x - hip.x) / d) * max, y: hip.y + ((p.y - hip.y) / d) * max } : p;
   }
 
   private toWorld(local: Point): Point {
     const k = this.size * this.scale;
     const c = Math.cos(this.tilt);
     const s = Math.sin(this.tilt);
-    return { x: this.x + (local.x * c - local.y * s) * k, y: this.y + (local.x * s + local.y * c) * k };
+    return { x: this.x + this.sway.x + (local.x * c - local.y * s) * k, y: this.y + this.sway.y + (local.x * s + local.y * c) * k };
+  }
+
+  /** A point in body space (rotated with the body, left side mirrored). */
+  private bodySpace(leg: Leg, p: Point): Point {
+    const c = Math.cos(-this.tilt);
+    const s = Math.sin(-this.tilt);
+    const dx = p.x - this.x;
+    const dy = p.y - this.y;
+    return { x: (dx * c - dy * s) * leg.side, y: dx * s + dy * c };
+  }
+
+  private inSector(leg: Leg, p: Point, slack = 0): boolean {
+    const local = this.bodySpace(leg, p);
+    const a = Math.atan2(local.y, local.x);
+    const [lo, hi] = SECTORS[leg.index];
+    return a >= lo - slack && a <= hi + slack;
+  }
+
+  /** Brings a point into a leg's sector (and a sensible distance from the body). */
+  private clampToSector(leg: Leg, p: Point, keepDistance = false): Point {
+    const local = this.bodySpace(leg, p);
+    const [lo, hi] = SECTORS[leg.index];
+    const a = clamp(Math.atan2(local.y, local.x), lo, hi);
+    const k = this.size * this.scale;
+    const d = Math.hypot(local.x, local.y);
+    const r = keepDistance ? d : clamp(d, 30 * k, 0.92 * REACH * k);
+    const lx = Math.cos(a) * r * leg.side;
+    const ly = Math.sin(a) * r;
+    const c = Math.cos(this.tilt);
+    const s = Math.sin(this.tilt);
+    return { x: this.x + lx * c - ly * s, y: this.y + lx * s + ly * c };
+  }
+
+  /** Where a foot is drawn: inside its sector, never further than the leg reaches. */
+  private drawnFoot(leg: Leg, foot: Point): Point {
+    let p = foot;
+    if (this.grounded && (this.pose === 'stand' || this.pose === 'dance') && !this.inSector(leg, p)) p = this.clampToSector(leg, p, true);
+    const hip = this.toWorld(leg.hip);
+    const k = this.size * this.scale;
+    const lifting = leg.t < 1 ? Math.sin(leg.t * Math.PI) : 0;
+    const length = (FEMUR + TIBIA) * k * (1 - 0.1 * lifting - 0.22 * this.fold);
+    const span = Math.hypot(p.x - hip.x, p.y - hip.y);
+    return span > length ? { x: hip.x + ((p.x - hip.x) / span) * length, y: hip.y + ((p.y - hip.y) / span) * length } : p;
   }
 
   // ---------------------------------------------------------------- drawing
@@ -360,13 +488,12 @@ export class SpiderRig {
       }
       if (this.carried && leg.index === 0 && leg.side === this.carried.side) {
         foot = this.toWorld({ x: 26 * leg.side, y: -62 });
+      } else {
+        foot = this.drawnFoot(leg, foot);
       }
       const lifting = leg.t < 1 ? Math.sin(leg.t * Math.PI) : 0;
       const shrink = 1 - 0.1 * lifting - 0.22 * this.fold;
-      const length = (FEMUR + TIBIA) * k * shrink;
-      const span = Math.hypot(foot.x - hip.x, foot.y - hip.y);
-      if (span > length) foot = { x: hip.x + ((foot.x - hip.x) / span) * length, y: hip.y + ((foot.y - hip.y) / span) * length };
-      const knee = solveKnee(hip, foot, FEMUR * k * shrink, TIBIA * k * shrink, { x: this.x, y: this.y });
+      const knee = solveKnee(hip, foot, FEMUR * k * shrink, TIBIA * k * shrink, { x: this.x + this.sway.x, y: this.y + this.sway.y });
       ctx.moveTo(hip.x, hip.y);
       ctx.lineTo(knee.x, knee.y);
       ctx.lineTo(foot.x, foot.y);
@@ -397,7 +524,7 @@ export class SpiderRig {
     const bob = dancing ? Math.abs(Math.sin(beat * Math.PI)) * -3 * k : 0;
     const wiggle = this.isWiggling ? Math.sin(this.time * 70) * 0.28 : 0;
     ctx.save();
-    ctx.translate(this.x, this.y + bob);
+    ctx.translate(this.x + this.sway.x, this.y + this.sway.y + bob);
     ctx.rotate(this.tilt + wiggle);
     ctx.scale(k, k * breathe);
     ctx.fillStyle = COLORS.page;
@@ -413,11 +540,15 @@ export class SpiderRig {
       let px = 0;
       let py = 0;
       if (this.lookAt) {
-        const dx = this.lookAt.x - this.x;
-        const dy = this.lookAt.y - (this.y - 12 * k);
+        // The pupil shifts towards what it looks at (in body space).
+        const eye = this.eye();
+        const dx = this.lookAt.x - eye.x;
+        const dy = this.lookAt.y - eye.y;
         const d = Math.hypot(dx, dy) || 1;
-        px = (dx / d) * 3;
-        py = (dy / d) * 3;
+        const c = Math.cos(-this.tilt);
+        const s = Math.sin(-this.tilt);
+        px = ((dx * c - dy * s) / d) * 3;
+        py = ((dx * s + dy * c) / d) * 3;
       }
       const pulse = this.rage ? 1 + 0.25 * Math.sin(this.time * 9) : 1;
       ctx.fillStyle = COLORS.eye;
