@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pickRoast, roastLines, TAUNT_GAP, TauntPicker, TAUNTS } from '../src/game/comedy';
-import { DIFFICULTIES } from '../src/game/difficulty';
+import { DEFAULT_DIFFICULTY, DIFFICULTIES } from '../src/game/difficulty';
 
 describe('taunts', () => {
   it('says at most one line every few seconds', () => {
@@ -98,10 +98,23 @@ describe('difficulty table', () => {
     expect(run('normal')).toBeLessThan(run('hard'));
   });
 
-  it('gets around on foot, smashing text, and keeps web zips for very far links', () => {
+  it('walks and bounds on long trips, zips some short ones, and tears up what it grips', () => {
     for (const d of Object.values(DIFFICULTIES)) {
-      expect(d.zipBeyond).toBeGreaterThanOrEqual(3000);
+      expect(d.zipChance).toBeGreaterThan(0);
+      expect(d.zipChance).toBeLessThan(0.5);
+      expect(d.leaps).toBeGreaterThan(0);
       expect(d.mischief).toBeGreaterThan(0.4);
+      expect(d.crush).toBeGreaterThan(0);
     }
+  });
+
+  it('runs on Normal, between the old Normal and Hard; Hard fumbles and wrecks more', () => {
+    expect(DEFAULT_DIFFICULTY).toBe('normal');
+    expect(DIFFICULTIES.normal.walkSpeed).toBeGreaterThan(125);
+    expect(DIFFICULTIES.normal.walkSpeed).toBeLessThan(DIFFICULTIES.hard.walkSpeed);
+    expect(DIFFICULTIES.hard.thinkMs).toBeGreaterThanOrEqual(1000);
+    expect(DIFFICULTIES.hard.hesitate).toBeGreaterThan(DIFFICULTIES.normal.hesitate);
+    expect(DIFFICULTIES.hard.crush).toBeGreaterThan(DIFFICULTIES.normal.crush);
+    expect(DIFFICULTIES.hard.mischief).toBeGreaterThan(DIFFICULTIES.normal.mischief);
   });
 });

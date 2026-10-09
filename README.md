@@ -14,8 +14,8 @@ on its way), and dives in. On Hard it also comes after you.
 1. Pick a **start** and a **target** page. Type to get suggestions (with their short descriptions),
    or roll the dice: a random start is a genuinely random article, a random target comes from a pool
    of well-known topics, so every race is winnable (in theory).
-2. Choose the spider's **difficulty** (below). Its brain is the same on every level; only its speed
-   and its manners change.
+2. Choose the spider's **difficulty** (below; the game opens on Normal). Its brain is the same on
+   every level; only its speed and its manners change.
 3. Click links in your pane (amber border, **YOU** badge). Only links to other articles in the body
    count. **← back** is allowed but counts as a hop. Hovering a link shows `hop N → Title`.
 4. First on the target wins. The finish screen compares both paths, hops, times and the number of
@@ -28,9 +28,9 @@ system asks for it) removes screen shake and shortens transitions; it never chan
 
 | Level | What the spider does |
 | --- | --- |
-| **Easy** | Thinks slowly, crawls, and destroys its own page. Never touches yours. Winnable. |
-| **Normal** | Adds a **web trap** (links near your cursor can't be clicked for a few seconds), the **fan laser** (a big beam from its eye sweeps a fan across your page, centred on your cursor, and burns every word and link it passes over, its own page included) and a **word bombardment** (words from its page land on your links and cover them), about every 25 s. **Rage** when your page links to the target: faster, angrier, glowing eye, attacks twice as often. Hard but winnable. |
-| **Hard** | An attack every 4–8 s, chained (web, then the fan laser, then a bombardment…), with no warning, rage always on, near-instant thinking, and it sprints across the page smashing the text. **Decoys**: up to 3 fake target links in your text; click one and it bursts into mini-spiders that run for the links nearest your cursor and eat them (no time lost). **Cursor harassment**, now and then (at most once every 45 s): a silk line sticks to your cursor and drags it for 2 s. **Link snatch** when you are winning: if the link you click takes you closer to the target and leaves you closer than the spider, it leaps across, eats that link, dives in, and the panes swap owners: you continue from its page. Never on your first three links, never the last two links of a path (the target, or a page that links to it), and at most one snatch a minute. Expected win rate: almost zero. |
+| **Easy** | Thinks slowly, crawls, and tears up its own page. Never touches yours. Winnable. |
+| **Normal** (default) | Runs. Adds a **web trap** (links near your cursor can't be clicked for a few seconds), the **fan laser** (a big beam from its eye sweeps a fan across your page, centred on your cursor, and burns every word and link it passes over, its own page included) and a **word bombardment** (words from its page land on your links and cover them), about every 25 s. **Rage** when your page links to the target: faster, angrier, glowing eye, attacks twice as often. Hard but winnable. |
+| **Hard** | An attack every 4–8 s, chained (web, then the fan laser, then a bombardment…), with no warning, rage always on. It tears its page apart as it goes (more destruction moves, more torn-up words) and fumbles a little for the right link: it often heads for another link first and thinks better of it. **Decoys**: up to 3 fake target links in your text; click one and it bursts into mini-spiders that run for the links nearest your cursor and eat them (no time lost). **Cursor harassment**, now and then (at most once every 45 s): a silk line sticks to your cursor and drags it for 2 s. **Link snatch** when you are winning: if the link you click takes you closer to the target and leaves you closer than the spider, it leaps across, eats that link, dives in, and the panes swap owners: you continue from its page. Never on your first three links, never the last two links of a path (the target, or a page that links to it), and at most one snatch a minute. Expected win rate: almost zero. |
 
 Hard is meant as a show, not a fair fight: people should lose, laugh, and share the clip. The spider
 may burn, web or cover the target link and may leave you with nothing clickable for a while. There are
@@ -118,18 +118,20 @@ thread. Each leg owns a sector around the body and its hip, knee and foot never 
 never pass over or under each other. Feet only ever stand on words (each planted foot boxes its word
 in cyan); a leg with no word within reach is held up rather than gripping thin air. The legs walk in
 an alternating tetrapod paced by the distance covered, each foot landing far enough ahead to stay
-balanced around its resting spot, and settle back when the spider stops. A foot landing on a word
-may crush it: the word cracks and its pieces drop off the line. One hop is:
+balanced around its resting spot, and settle back when the spider stops. What it breaks is what it
+grips: a foot letting go of a word may tear it up, and the word cracks and its pieces drop off the
+line. One hop is:
 
 1. **scan**: rays from the eye to every visible link while the brain decides; the SPIDER.BRAIN panel
    shows the best scores;
-2. **crawl & eat**: the eye laser locks the link (slicing words on the way), then the spider goes
-   there **on foot**, weaving from side to side like a snake, breaking into a run when the link is far,
-   and straightens out for a short run along the link's line, from whichever side it comes. It eats
-   every word under its body, leaving a swath of destroyed text; on the way it randomly lasers a word
-   in half, sweeps the laser along a line, plucks a word and throws it off the page (`yeet()`), or
-   stomps one to pieces (`THUD`). While it thinks it paces about, eating as it goes. Only a link very
-   far down the page gets a **web zip** (a silk line, then one long jump);
+2. **crawl & eat**: the eye laser locks the link (slicing words on the way); sometimes it heads for
+   another link first and thinks better of it. Then the spider goes there **on foot**, weaving from
+   side to side like a snake, breaking into a run and bounding forward now and then when the link is
+   far, and straightens out for a short run along the link's line, from whichever side it comes. Its
+   feet tear up the words they grip; on the way it randomly lasers a word in half, sweeps the laser
+   along a line, plucks a word and throws it off the page (`yeet()`), or stomps one to pieces
+   (`THUD`). While it thinks it paces about. A link a few lines away is sometimes reached with a
+   **web zip** instead (a silk line, then one long jump);
 3. **grab**: the legs wrap the link, the link lights up and the pane edges glitch;
 4. **hop**: it dives in, the page glitches out in RGB-split slices, the next article glitches in,
    and the spider drops in on its silk thread.

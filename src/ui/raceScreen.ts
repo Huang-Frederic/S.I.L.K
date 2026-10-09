@@ -229,10 +229,11 @@ export class RaceScreen {
       walk: d.walkSpeed * k,
       sprint: d.sprint,
       zip: d.zipSpeed * k,
-      zipBeyond: d.zipBeyond,
+      zipChance: d.zipChance,
+      leaps: d.leaps,
       mischief: d.mischief,
       crush: d.crush,
-      pace: d.id === 'hard' ? 1.8 : d.id === 'normal' ? 1.15 : 1,
+      pace: d.id === 'hard' ? 1.35 : d.id === 'normal' ? 1.15 : 1,
     };
   }
 
@@ -299,7 +300,8 @@ export class RaceScreen {
       pane: () => this.spiderPane,
       thinkMs: () => difficulty.thinkMs * (this.rage ? RAGE.think : 1),
       scoreSeconds: difficulty.id === 'easy' ? 1.1 : 0.7,
-      grabSeconds: difficulty.id === 'easy' ? 0.9 : difficulty.id === 'normal' ? 0.6 : 0.3,
+      hesitate: difficulty.hesitate,
+      grabSeconds: difficulty.id === 'easy' ? 0.9 : difficulty.id === 'normal' ? 0.6 : 0.45,
       isMissing: (error) => error instanceof ArticleNotFoundError,
       onDecision: (decision, page) => this.showBrain(decision, page),
       onMove: (title, via, note) => this.onSpiderMove(title, via, note),

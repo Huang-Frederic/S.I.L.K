@@ -7,7 +7,7 @@ import './styles/base.css';
 import './styles/article.css';
 import './styles/screens.css';
 
-import { DEFAULT_DIFFICULTY, DIFFICULTIES, isDifficultyId, type DifficultyId } from './game/difficulty';
+import { DEFAULT_DIFFICULTY, DIFFICULTIES, type DifficultyId } from './game/difficulty';
 import type { ValidatedPair } from './game/pairs';
 import { settings } from './settings';
 import { LexicalRanker } from './spider/ai/lexical';
@@ -34,7 +34,8 @@ embedder.load().catch(() => {
 let currentRace: RaceScreen | null = null;
 let currentTitle: TitleScreen | null = null;
 let lastPair: ValidatedPair | null = null;
-let difficulty: DifficultyId = isDifficultyId(settings.difficulty) ? (settings.difficulty as DifficultyId) : DEFAULT_DIFFICULTY;
+/** The game opens on Normal; the choice then holds for rematches and new pairs. */
+let difficulty: DifficultyId = DEFAULT_DIFFICULTY;
 
 // Reduce motion is applied as a class so that CSS transitions can follow it.
 const applyMotion = () => document.documentElement.classList.toggle('reduce-motion', settings.reduceMotion);
@@ -57,7 +58,6 @@ function showTitle(): void {
     initialDifficulty: difficulty,
     onStart: (choice) => {
       difficulty = choice.difficulty;
-      settings.difficulty = difficulty;
       startRace(choice.pair);
     },
   });

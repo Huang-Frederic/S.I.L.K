@@ -34,6 +34,8 @@ export interface RunnerOptions {
   /** How long score labels and the grab last (s). */
   scoreSeconds: number;
   grabSeconds: number;
+  /** Chance that it heads for another link first, then thinks better of it. */
+  hesitate: number;
   isMissing: (error: unknown) => boolean;
   onDecision?: (decision: Decision, page: SpiderArticlePage) => void;
   /** The spider moved to a new page. */
@@ -179,6 +181,14 @@ export class SpiderRunner {
         if (a) tags.push({ anchor: a, score, best: i === 0, tag: i === 0 ? REASON_TAGS[decision.reason] : undefined });
       });
       await actor.showScores(tags, this.o.scoreSeconds);
+      // Now and then it goes the wrong way first (never with the target in sight).
+      if (decision.reason !== 'target' && Math.random() < this.o.hesitate) {
+        const other = decision.shortlist
+          .slice(1, 4)
+          .map(({ link: l }) => ({ title: l.title, anchor: findAnchor(pane, l) }))
+          .find((o) => o.anchor && o.anchor !== anchor);
+        if (other?.anchor) await actor.feint(other.anchor, other.title);
+      }
       await actor.lock(anchor, link.title);
       await actor.crawlTo(anchor);
       await actor.grab(anchor, link.title, this.o.grabSeconds, next.catch(() => null));
