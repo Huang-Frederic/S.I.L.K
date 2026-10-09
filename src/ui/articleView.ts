@@ -82,7 +82,12 @@ export class ArticleView {
   showLoading(label: string): void {
     this.element.classList.add('is-busy');
     this.overlay.replaceChildren(
-      h('div', { class: 'pane-message pane-loading' }, h('span', { class: 'loader', attrs: { 'aria-hidden': 'true' } }), h('span', { text: label })),
+      h(
+        'div',
+        { class: 'pane-message pane-loading' },
+        h('span', { class: 'loader', attrs: { 'aria-hidden': 'true' } }, h('i'), h('i'), h('i')),
+        h('span', { text: label }),
+      ),
     );
   }
 

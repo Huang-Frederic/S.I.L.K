@@ -41,7 +41,7 @@ export class WorkerEmbedder implements Embedder {
         const message = event.data;
         switch (message.type) {
           case 'progress':
-            this.progress = message.fraction;
+            this.progress = Math.max(this.progress, message.fraction);
             this.emit();
             break;
           case 'ready':

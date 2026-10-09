@@ -1,27 +1,30 @@
 /* ------------------------------------------------------------------------
- * S.I.L.K: game chrome (dark, chunky, pixel-flavoured UI).
- * Article typography lives in article.css.
+ * S.I.L.K: game chrome. Dark "tech" HUD look: thin lines, neon accents,
+ * monospace labels. Article typography lives in article.css.
  * --------------------------------------------------------------------- */
 
 :root {
-  --bg: #120e18;
-  --bg-2: #1a1422;
-  --panel: #211a2c;
-  --panel-2: #2b2238;
-  --edge: #07050b;
-  --ink: #f3efe6;
-  --muted: #a99fbb;
-  --dim: #6f6583;
-  --accent: #5ef2c8;
-  --accent-ink: #0d2a24;
-  --spider: #ff5d8f;
-  --spider-ink: #3a0b1d;
-  --warn: #ffcc4d;
-  --danger: #ff6b5e;
-  --paper: #fbfaf7;
-  --font-ui: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
-  --pixel-edge: 0 0 0 3px var(--edge);
-  --pixel-drop: 6px 6px 0 0 rgba(0, 0, 0, 0.45);
+  --bg: #030406;
+  --bg-2: #07090d;
+  --panel: rgba(9, 12, 17, 0.94);
+  --panel-2: #0c1016;
+  --line: #1a212b;
+  --line-2: #273140;
+  --ink: #e6edf3;
+  --muted: #8b96a5;
+  --dim: #566170;
+  --cyan: #5ee6ff;
+  --cyan-ink: #00141a;
+  --cyan-soft: rgba(94, 230, 255, 0.12);
+  --pink: #ff3d7f;
+  --pink-ink: #1f000b;
+  --pink-soft: rgba(255, 61, 127, 0.12);
+  --amber: #ffcc4d;
+  --danger: #ff5d6c;
+  --font-ui: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --glow-cyan: 0 0 18px rgba(94, 230, 255, 0.28);
+  --glow-pink: 0 0 18px rgba(255, 61, 127, 0.3);
   color-scheme: dark;
 }
 
@@ -36,10 +39,12 @@ body {
 }
 
 body {
-  background-color: var(--bg);
-  /* A faint pixel grid, like graph paper for spiders. */
-  background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1.5px);
-  background-size: 16px 16px;
+  background:
+    radial-gradient(1100px 620px at 78% -12%, rgba(94, 230, 255, 0.08), transparent 60%),
+    radial-gradient(900px 520px at -5% 112%, rgba(255, 61, 127, 0.07), transparent 60%),
+    linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px) 0 0 / 44px 44px,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px) 0 0 / 44px 44px,
+    var(--bg);
   color: var(--ink);
   font-family: var(--font-ui);
   font-size: 15px;
@@ -56,102 +61,131 @@ body {
 }
 
 a {
-  color: var(--accent);
+  color: var(--cyan);
 }
 
 :focus-visible {
-  outline: 3px solid var(--warn);
+  outline: 1px solid var(--cyan);
   outline-offset: 2px;
+  box-shadow: var(--glow-cyan);
 }
 
-.visually-hidden {
-  position: absolute !important;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+::selection {
+  background: rgba(94, 230, 255, 0.3);
+}
+
+/* Thin dark scrollbars. */
+* {
+  scrollbar-color: #2a3340 transparent;
+  scrollbar-width: thin;
 }
 
 /* ---------------------------------------------------------------- buttons */
 
 .btn {
-  --btn-bg: var(--accent);
-  --btn-ink: var(--accent-ink);
+  --btn-color: var(--cyan);
+  --btn-ink: var(--cyan-ink);
   appearance: none;
-  border: 0;
-  border-radius: 0;
-  padding: 0.7em 1.15em;
-  background: var(--btn-bg);
-  color: var(--btn-ink);
-  font: 700 0.9rem/1 var(--font-ui);
-  letter-spacing: 0.08em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  padding: 0.72em 1.15em;
+  border: 1px solid var(--btn-color);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--btn-color);
+  font: 600 0.74rem/1 var(--font-mono);
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  cursor: pointer;
-  box-shadow:
-    inset -3px -3px 0 0 rgba(0, 0, 0, 0.3),
-    inset 3px 3px 0 0 rgba(255, 255, 255, 0.35),
-    var(--pixel-edge);
-  transition: filter 0.1s;
   white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    box-shadow 0.15s,
+    color 0.15s;
 }
 
 .btn:hover {
-  filter: brightness(1.08);
+  background: color-mix(in srgb, var(--btn-color) 12%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--btn-color) 30%, transparent);
 }
 
 .btn:active {
-  transform: translateY(2px);
-  box-shadow:
-    inset 3px 3px 0 0 rgba(0, 0, 0, 0.3),
-    var(--pixel-edge);
+  transform: translateY(1px);
 }
 
 .btn:disabled {
   cursor: not-allowed;
-  filter: grayscale(0.8) brightness(0.7);
+  opacity: 0.4;
+  box-shadow: none;
   transform: none;
 }
 
+.btn-primary {
+  background: var(--btn-color);
+  color: var(--btn-ink);
+}
+
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--btn-color) 85%, white);
+}
+
 .btn-secondary {
-  --btn-bg: var(--panel-2);
-  --btn-ink: var(--ink);
+  --btn-color: #9aa7b8;
 }
 
 .btn-danger {
-  --btn-bg: var(--danger);
-  --btn-ink: #2a0805;
+  --btn-color: var(--danger);
+  --btn-ink: #22030a;
 }
 
 .btn-spider {
-  --btn-bg: var(--spider);
-  --btn-ink: var(--spider-ink);
+  --btn-color: var(--pink);
+  --btn-ink: var(--pink-ink);
 }
 
 .btn-small {
-  padding: 0.5em 0.8em;
-  font-size: 0.75rem;
+  padding: 0.55em 0.8em;
+  font-size: 0.66rem;
 }
 
 .btn-icon {
-  padding: 0.55em 0.7em;
-  font-size: 1rem;
-  line-height: 1;
+  padding: 0.55em 0.75em;
 }
 
 /* ------------------------------------------------------------- generic UI */
 
+/* Panel with thin border and glowing corner ticks. */
 .panel {
+  position: relative;
+  border: 1px solid var(--line);
   background: var(--panel);
-  box-shadow: var(--pixel-edge), var(--pixel-drop);
+  backdrop-filter: blur(6px);
+}
+
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  --tick: var(--cyan);
+  background:
+    linear-gradient(var(--tick), var(--tick)) top left / 14px 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top left / 1px 14px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top right / 14px 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top right / 1px 14px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom left / 14px 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom left / 1px 14px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom right / 14px 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom right / 1px 14px no-repeat;
 }
 
 .label {
   display: block;
   color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  font: 600 0.66rem/1.4 var(--font-mono);
+  letter-spacing: 0.2em;
   text-transform: uppercase;
 }
 
@@ -161,28 +195,40 @@ a {
 
 .field-row {
   display: flex;
-  gap: 10px;
-  margin-top: 6px;
+  gap: 8px;
+  margin-top: 7px;
 }
 
 .input {
   flex: 1;
   min-width: 0;
-  padding: 0.7em 0.8em;
-  border: 0;
-  border-radius: 0;
-  background: var(--bg);
+  padding: 0.72em 0.85em;
+  border: 1px solid var(--line-2);
+  border-radius: 2px;
+  background: #05070a;
   color: var(--ink);
-  font: 1rem/1.2 var(--font-ui);
-  box-shadow: inset 3px 3px 0 0 rgba(0, 0, 0, 0.5), var(--pixel-edge);
+  font: 0.98rem/1.2 var(--font-ui);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
 .input::placeholder {
   color: var(--dim);
 }
 
+.input:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
 .field-error {
-  margin: 6px 0 0;
+  margin: 7px 0 0;
   color: var(--danger);
   font-size: 0.8rem;
 }
@@ -190,58 +236,59 @@ a {
 .ac-list {
   position: absolute;
   z-index: 20;
-  top: calc(100% + 6px);
+  top: calc(100% + 4px);
   left: 0;
   right: 0;
-  max-height: 16rem;
+  max-height: 17rem;
   overflow-y: auto;
   margin: 0;
   padding: 4px 0;
   list-style: none;
-  background: var(--panel-2);
-  box-shadow: var(--pixel-edge), var(--pixel-drop);
+  border: 1px solid var(--line-2);
+  background: #080b10;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
 }
 
 .ac-option {
-  padding: 0.45em 0.8em;
+  padding: 0.5em 0.85em;
   cursor: pointer;
 }
 
 .ac-option:hover,
 .ac-option.is-active {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--cyan-soft);
+  color: var(--cyan);
 }
 
-/* Three pixel blocks filling up one after the other. */
+/* Three blocks lighting up in turn. */
 .loader {
-  display: inline-block;
-  flex: none;
-  width: 8px;
-  height: 8px;
-  margin-right: 24px;
+  display: inline-flex;
+  gap: 4px;
+}
+
+.loader i {
+  width: 6px;
+  height: 6px;
   background: currentColor;
-  box-shadow:
-    12px 0 0 currentColor,
-    24px 0 0 currentColor;
-  animation: loader 0.9s steps(1) infinite;
+  box-shadow: 0 0 8px currentColor;
+  animation: loader 0.9s infinite;
+}
+
+.loader i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.loader i:nth-child(3) {
+  animation-delay: 0.3s;
 }
 
 @keyframes loader {
-  0% {
-    box-shadow:
-      12px 0 0 transparent,
-      24px 0 0 transparent;
+  0%,
+  100% {
+    opacity: 0.15;
   }
-  33% {
-    box-shadow:
-      12px 0 0 currentColor,
-      24px 0 0 transparent;
-  }
-  66% {
-    box-shadow:
-      12px 0 0 currentColor,
-      24px 0 0 currentColor;
+  40% {
+    opacity: 1;
   }
 }
 
@@ -261,40 +308,47 @@ a {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  box-shadow: var(--pixel-edge), var(--pixel-drop);
-  background: var(--panel);
+  border: 1px solid var(--line);
+  background: #05070a;
 }
 
 .pane-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 6px 10px;
-  background: var(--panel-2);
-  font-size: 0.8rem;
+  gap: 12px;
+  min-height: 42px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #0b0f15, #080b10);
+  font: 0.74rem/1.3 var(--font-mono);
 }
 
 .pane-who {
-  padding: 0.25em 0.55em;
-  background: var(--accent);
-  color: var(--accent-ink);
+  padding: 0.3em 0.6em;
+  border: 1px solid var(--cyan);
+  color: var(--cyan);
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  box-shadow: inset 0 0 12px rgba(94, 230, 255, 0.15);
 }
 
 .pane-spider .pane-who {
-  background: var(--spider);
-  color: var(--spider-ink);
+  border-color: var(--pink);
+  color: var(--pink);
+  box-shadow: inset 0 0 12px rgba(255, 61, 127, 0.18);
 }
 
 .pane-stat {
   color: var(--muted);
   white-space: nowrap;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .pane-stat strong {
   color: var(--ink);
+  font-size: 0.9rem;
 }
 
 .pane-where {
@@ -311,7 +365,7 @@ a {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  background: var(--paper);
+  background: var(--wiki-bg, #06080b);
 }
 
 .pane-scroll {
@@ -326,7 +380,7 @@ a {
 .pane-overlay {
   position: absolute;
   inset: 0;
-  z-index: 5;
+  z-index: 6;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -339,30 +393,38 @@ a {
 }
 
 .pane-body.is-busy .pane-scroll {
-  opacity: 0.35;
-  filter: grayscale(0.6);
+  opacity: 0.3;
+  filter: saturate(0.4);
   transition: opacity 0.15s;
 }
 
 .pane-message {
+  position: relative;
   max-width: 28rem;
   padding: 14px 18px;
-  background: var(--panel);
+  border: 1px solid var(--line-2);
+  background: rgba(6, 8, 12, 0.95);
   color: var(--ink);
   text-align: center;
-  box-shadow: var(--pixel-edge), var(--pixel-drop);
   pointer-events: auto;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
 }
 
 .pane-loading {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: var(--accent);
+  color: var(--cyan);
+  font: 0.8rem/1.4 var(--font-mono);
+  letter-spacing: 0.06em;
 }
 
 .pane-loading span:last-child {
   color: var(--ink);
+}
+
+.pane-error {
+  border-color: rgba(255, 93, 108, 0.6);
 }
 
 .pane-error p {
@@ -377,4 +439,37 @@ a {
 
 .pane-actions:empty {
   display: none;
+}
+
+/* The spider's copy: driven by its camera, never by the reader. */
+.pane-spider .pane-scroll {
+  overflow: hidden;
+  transition: opacity 0.25s ease;
+}
+
+.pane-body.is-warping .pane-scroll {
+  opacity: 0;
+  transition: none;
+}
+
+.fx-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.spider-status {
+  color: var(--ink);
+}
+
+.spider-brain {
+  padding: 0.25em 0.55em;
+  border: 1px solid var(--line-2);
+  color: var(--muted);
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }

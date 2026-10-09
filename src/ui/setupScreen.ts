@@ -99,7 +99,7 @@ export function createSetupScreen(options: SetupScreenOptions): HTMLElement {
       h(
         'p',
         { class: 'setup-pitch' },
-        'Race a pixel spider across Wikipedia. Starting from the same article, reach the target by clicking links only. First to arrive wins.',
+        'Race an AI web-crawler spider across Wikipedia. Same start article, same target: click links only, first to arrive wins.',
       ),
       form,
     ),
