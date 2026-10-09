@@ -8,6 +8,7 @@
 import { settings } from '../settings';
 import type { Box, Drawable, Stage } from '../stage/stage';
 import { Z } from '../stage/stage';
+import { TEXT_BLOCKS } from '../stage/wordIndex';
 import { CYAN, RED } from './fx';
 
 export interface Bar {
@@ -33,23 +34,35 @@ const LINK = '#88A3E8';
 const TITLE = '#C8CED6';
 const MAX_BARS = 1400;
 
-/** Captures the visible text of `root` as bars (content coordinates). */
+/**
+ * Captures the visible text of `root` as bars (content coordinates). Only
+ * the text blocks on screen are walked: long articles have tens of
+ * thousands of text nodes, almost all of them out of view.
+ */
 export function captureBars(root: Element, surface: GlitchSurface): Bar[] {
   const view = surface.visibleContent();
   const bars: Bar[] = [];
   const range = document.createRange();
-  const walker = document.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */);
-  for (let node = walker.nextNode(); node && bars.length < MAX_BARS; node = walker.nextNode()) {
-    const parent = node.parentElement;
-    if (!parent || !node.textContent?.trim()) continue;
-    const color = parent.closest('a') ? LINK : parent.closest('h1, h2, h3') ? TITLE : TEXT;
-    range.selectNodeContents(node);
-    for (const rect of Array.from(range.getClientRects())) {
-      if (rect.width < 1) continue;
-      const box = surface.toContent(rect);
-      if (box.bottom < view.top || box.top > view.bottom) continue;
-      const h = Math.max(3, (box.bottom - box.top) * 0.36);
-      bars.push({ x: box.left, y: (box.top + box.bottom) / 2 - h / 2, w: box.right - box.left, h, color });
+  for (const block of Array.from(root.querySelectorAll(TEXT_BLOCKS))) {
+    if (bars.length >= MAX_BARS) break;
+    // Nested blocks are walked with their outermost block.
+    const outer = block.parentElement?.closest(TEXT_BLOCKS);
+    if (outer && root.contains(outer)) continue;
+    const blockBox = surface.toContent(block.getBoundingClientRect());
+    if (blockBox.bottom < view.top || blockBox.top > view.bottom) continue;
+    const walker = document.createTreeWalker(block, 4 /* NodeFilter.SHOW_TEXT */);
+    for (let node = walker.nextNode(); node && bars.length < MAX_BARS; node = walker.nextNode()) {
+      const parent = node.parentElement;
+      if (!parent || !node.textContent?.trim()) continue;
+      const color = parent.closest('a') ? LINK : parent.closest('h1, h2, h3') ? TITLE : TEXT;
+      range.selectNodeContents(node);
+      for (const rect of Array.from(range.getClientRects())) {
+        if (rect.width < 1) continue;
+        const box = surface.toContent(rect);
+        if (box.bottom < view.top || box.top > view.bottom) continue;
+        const h = Math.max(3, (box.bottom - box.top) * 0.36);
+        bars.push({ x: box.left, y: (box.top + box.bottom) / 2 - h / 2, w: box.right - box.left, h, color });
+      }
     }
   }
   return bars;

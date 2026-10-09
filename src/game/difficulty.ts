@@ -7,7 +7,8 @@
  *    thinking. Winnable.
  *  - Normal: adds web traps, laser snipes and word bombardments, about every
  *    25 s (more often in rage). Hard but winnable.
- *  - Hard: everything, every 4-8 s, chained, with no warning; it snatches the
+ *  - Hard: everything, every 4-8 s, chained, with no warning; it runs across
+ *    the page smashing the text, snatches the
  *    links you reach for, plants decoys, lays eggs, turns off the lights and
  *    tugs your cursor. Rage is always on. Expected win rate: almost zero.
  *
@@ -29,9 +30,14 @@ export interface Difficulty {
   thinkMs: number;
   /** Crawling speed over the text (CSS px per second). */
   walkSpeed: number;
+  /** Running speed for far links, as a multiple of walkSpeed (reached ~1000 px away). */
+  sprint: number;
   /** Speed of a web zip (CSS px per second). */
   zipSpeed: number;
-  /** Links farther than this (px) are reached with a web zip instead of walking. */
+  /**
+   * Links farther than this (px) are reached with a web zip; anything closer
+   * is reached on foot, smashing the text on the way.
+   */
   zipBeyond: number;
   /** Random destruction moves (laser cut, grab & throw, stomp) per second of crawling. */
   mischief: number;
@@ -65,10 +71,11 @@ export const DIFFICULTIES: Record<DifficultyId, Difficulty> = {
     label: 'Easy',
     blurb: 'It only crawls and eats its own page. Slow thinker. Never touches you. Winnable.',
     thinkMs: 6500,
-    walkSpeed: 62,
+    walkSpeed: 70,
+    sprint: 1.8,
     zipSpeed: 650,
-    zipBeyond: 620,
-    mischief: 0.22,
+    zipBeyond: 3600,
+    mischief: 0.45,
     attacks: [],
     cooldown: [999, 999],
     firstAttack: 999,
@@ -89,10 +96,11 @@ export const DIFFICULTIES: Record<DifficultyId, Difficulty> = {
     label: 'Normal',
     blurb: 'Web traps, laser snipes and word bombs, about every 25 s. Hard but winnable.',
     thinkMs: 3200,
-    walkSpeed: 108,
+    walkSpeed: 125,
+    sprint: 2.4,
     zipSpeed: 1100,
-    zipBeyond: 380,
-    mischief: 0.32,
+    zipBeyond: 4200,
+    mischief: 0.75,
     attacks: ['web', 'laser', 'bombard'],
     cooldown: [22, 28],
     firstAttack: 14,
@@ -113,10 +121,11 @@ export const DIFFICULTIES: Record<DifficultyId, Difficulty> = {
     label: 'Hard',
     blurb: 'Everything, every few seconds, no warning. It steals the links you reach for. Expected win rate: almost zero.',
     thinkMs: 250,
-    walkSpeed: 250,
+    walkSpeed: 300,
+    sprint: 3,
     zipSpeed: 2300,
-    zipBeyond: 150,
-    mischief: 0.5,
+    zipBeyond: 5200,
+    mischief: 1.1,
     attacks: ['web', 'laser', 'bombard', 'decoy', 'eggs', 'blackout', 'harass'],
     cooldown: [4, 8],
     firstAttack: 3,

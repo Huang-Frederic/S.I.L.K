@@ -18,9 +18,15 @@
 /* Title                                                                    */
 /* ======================================================================== */
 
+/*
+ * One 1280 px column, three rows on a two-column grid that share the same
+ * edges: (1) the title and the pitch, (2) the race form and the live demo,
+ * same height, (3) the fine print and the settings. Then "How it works".
+ */
 .screen-title {
+  --hero-gap: clamp(24px, 3vw, 44px);
   min-height: 100%;
-  padding: 0 clamp(18px, 5vw, 72px) 96px;
+  padding: 0 clamp(16px, 4.5vw, 64px) 96px;
 }
 
 .title-nav,
@@ -34,7 +40,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 84px;
+  height: 76px;
   border-bottom: 1px solid var(--rule);
 }
 
@@ -66,46 +72,65 @@
 }
 
 .title-hero {
+  padding-top: 44px;
+}
+
+.hero-head,
+.hero-play {
   display: grid;
-  grid-template-columns: minmax(0, 1.02fr) minmax(0, 1fr);
-  gap: clamp(32px, 4vw, 64px);
-  padding-top: 64px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: var(--hero-gap);
+}
+
+/* Row 1: title on the left, pitch on the right, sharing a baseline. */
+.hero-head {
+  align-items: end;
+  margin-bottom: 32px;
 }
 
 .hero-logo {
-  margin: 22px 0 18px;
+  margin: 14px 0 12px;
   font-size: inherit;
+  line-height: 1;
+}
+
+.hero-logo .logo-big {
+  font-size: clamp(64px, 8.6vw, 124px);
 }
 
 .hero-sub {
   margin: 0;
   color: var(--muted);
-  font: 500 16px var(--font-mono);
+  font: 500 15px var(--font-mono);
   letter-spacing: 0.03em;
 }
 
 .hero-pitch {
-  max-width: 33em;
-  margin: 26px 0 34px;
+  max-width: 34em;
+  margin: 0;
+  padding-bottom: 2px;
   color: var(--ink-2);
-  font-size: 21px;
-  line-height: 1.5;
+  font-size: 19px;
+  line-height: 1.55;
+}
+
+/* Row 2: the form and the demo, side by side, same height. */
+.hero-play {
+  align-items: stretch;
 }
 
 .race-form {
-  position: relative;
-  max-width: 600px;
-  padding: 26px 26px 30px;
-}
-
-.field + .field {
-  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  padding: 24px 26px 26px;
 }
 
 .field-row {
   display: flex;
   align-items: stretch;
-  gap: 12px;
+  gap: 10px;
 }
 
 .field-input {
@@ -114,12 +139,64 @@
   min-width: 0;
 }
 
-.field-flow {
+.field-error {
+  margin-top: 6px;
+}
+
+.form-actions {
   display: flex;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.btn-start {
+  flex: 1;
+  min-height: 54px;
+  font-size: 17px;
+}
+
+.btn-random {
+  min-height: 54px;
+  padding: 0 18px;
+  font-size: 15px;
+}
+
+/* Row 3: fine print left, settings right. */
+.title-foot {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  padding: 0 2px 0 6px;
+  justify-content: space-between;
+  gap: 12px 28px;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+  color: var(--dim);
+  font: 400 12.5px/1.6 var(--font-mono);
+}
+
+.title-foot p {
+  margin: 0;
+}
+
+.title-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 28px;
+}
+
+.hard-wins {
   color: var(--muted);
-  font-size: 26px;
+  font: 500 12px/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.hard-wins strong {
+  color: var(--red);
+  font-size: 14px;
 }
 
 /* Autocomplete */
@@ -167,7 +244,7 @@
 /* Difficulty: segmented control */
 .difficulty {
   min-width: 0;
-  margin: 22px 0 0;
+  margin: 0;
   padding: 0;
   border: 0;
 }
@@ -229,68 +306,81 @@
   line-height: 1.5;
 }
 
-.form-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 16px 28px;
-  margin-top: 20px;
-}
-
-.btn-start {
-  min-width: min(100%, 300px);
-  min-height: 56px;
-  font-size: 17px;
-}
-
-.title-foot {
+/* Live demo: a card with its HUD in a header bar, the spider below. */
+.demo-card {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  max-width: 600px;
-  margin-top: 30px;
-  color: var(--dim);
-  font: 400 12.5px/1.6 var(--font-mono);
-}
-
-.title-foot p {
+  min-width: 0;
   margin: 0;
+  overflow: hidden;
 }
 
-.title-settings {
+.demo-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 14px 30px;
+  justify-content: space-between;
+  gap: 6px 18px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font: 400 12px/1.4 var(--font-mono);
 }
 
-.hard-wins {
-  color: var(--muted);
-  font: 500 12px/1 var(--font-mono);
-  letter-spacing: 0.12em;
+.demo-live {
+  color: var(--dim);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.hard-wins strong {
+.demo-live::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 8px rgba(255, 43, 58, 0.8);
+}
+
+.demo-hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.demo-key {
+  color: var(--dim);
+}
+
+.demo-value {
+  color: var(--ink-2);
+}
+
+.demo-state {
   color: var(--red);
-  font-size: 14px;
 }
 
-/* Live demo */
-.hero-right {
-  min-width: 0;
-  padding-top: 36px;
+.demo-state.is-crawl,
+.demo-state.is-scan {
+  color: var(--cyan);
 }
 
-.demo {
+.demo-body {
   position: relative;
-  padding: 26px 8px 40px;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-height: 300px;
+  padding: 26px 30px;
+  background: var(--page);
 }
 
 .demo-text {
   margin: 0;
   color: #525c67;
-  font: 400 clamp(20px, 1.9vw, 27px) / 1.85 var(--font-serif);
+  font: 400 clamp(18px, 1.55vw, 23px) / 1.85 var(--font-serif);
 }
 
 .demo-text strong {
@@ -303,32 +393,6 @@
 
 .demo-text .sw.is-held {
   color: var(--line);
-}
-
-.demo-hud {
-  position: absolute;
-  top: -6px;
-  right: 0;
-  z-index: 31;
-  padding: 6px 10px;
-  background: rgba(11, 14, 18, 0.8);
-  color: var(--ink-2);
-  font: 400 13px/1.7 var(--font-mono);
-  pointer-events: none;
-}
-
-.demo-hud-row span:first-child {
-  display: inline-block;
-  min-width: 9.5em;
-}
-
-.demo-state {
-  color: var(--red);
-}
-
-.demo-state.is-crawl,
-.demo-state.is-scan {
-  color: var(--cyan);
 }
 
 /* How it works */
@@ -1174,18 +1238,24 @@
 /* ======================================================================== */
 
 @media (max-width: 1100px) {
-  .title-hero {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .hero-right {
-    order: -1;
-    max-width: 640px;
-    padding-top: 0;
-  }
-
   .how-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 960px) {
+  .hero-head,
+  .hero-play {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 20px;
+  }
+
+  .hero-pitch {
+    max-width: none;
+  }
+
+  .demo-body {
+    min-height: 260px;
   }
 }
 
@@ -1276,24 +1346,24 @@
     gap: 18px;
   }
 
-  .hero-right {
+  .demo-card {
     display: none;
   }
 
   .title-hero {
-    padding-top: 36px;
+    padding-top: 28px;
   }
 
   .hero-pitch {
-    font-size: 18px;
+    font-size: 17px;
   }
 
   .race-form {
-    padding: 18px 16px 22px;
+    padding: 18px 16px 20px;
   }
 
-  .field-flow {
-    display: none;
+  .form-actions {
+    flex-direction: column;
   }
 
   .how-grid {

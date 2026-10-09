@@ -87,6 +87,15 @@ describe('difficulty table', () => {
     expect(DIFFICULTIES.normal.thinkMs).toBeGreaterThan(DIFFICULTIES.hard.thinkMs);
     expect(DIFFICULTIES.easy.walkSpeed).toBeLessThan(DIFFICULTIES.normal.walkSpeed);
     expect(DIFFICULTIES.normal.walkSpeed).toBeLessThan(DIFFICULTIES.hard.walkSpeed);
-    expect(DIFFICULTIES.hard.zipBeyond).toBeLessThan(DIFFICULTIES.normal.zipBeyond);
+    const run = (id: 'easy' | 'normal' | 'hard') => DIFFICULTIES[id].walkSpeed * DIFFICULTIES[id].sprint;
+    expect(run('easy')).toBeLessThan(run('normal'));
+    expect(run('normal')).toBeLessThan(run('hard'));
+  });
+
+  it('gets around on foot, smashing text, and keeps web zips for very far links', () => {
+    for (const d of Object.values(DIFFICULTIES)) {
+      expect(d.zipBeyond).toBeGreaterThanOrEqual(3000);
+      expect(d.mischief).toBeGreaterThan(0.4);
+    }
   });
 });

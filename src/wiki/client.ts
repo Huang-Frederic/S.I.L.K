@@ -135,6 +135,11 @@ export class WikiClient {
     return { title: canonical, requestedTitle, html: response.text };
   }
 
+  /** Gives a queued article request the player's priority (the player is about to open it). */
+  prioritizeArticle(title: string): void {
+    this.http.promote(`${this.restBase}/page/html/${titleToPathSegment(normalizeTitle(title))}`);
+  }
+
   /** Resolves every main-namespace link of a page (redirects, red links, disambiguations). */
   async fetchLinkResolution(title: string, maxBatches = 4): Promise<LinkResolution> {
     const result: LinkResolution = {

@@ -20,31 +20,40 @@ const TEXT: Array<string | { strong: string }> = [
 const center = (b: Box): Point => ({ x: (b.left + b.right) / 2, y: (b.top + b.bottom) / 2 });
 
 export class TitleDemo {
+  /** The whole card: a header bar with the HUD, and the stage below it. */
   readonly element: HTMLElement;
+  /** Where the spider lives (the stage's root). */
+  private readonly body: HTMLElement;
   private stage: Stage | null = null;
   private readonly text: HTMLElement;
   private readonly hud: Record<'state' | 'links' | 'match', HTMLElement>;
 
   constructor() {
     this.text = h('p', { class: 'demo-text' }, ...TEXT.map((part) => (typeof part === 'string' ? part : h('strong', { text: part.strong }))));
-    const row = (key: string, value: HTMLElement) => h('div', { class: 'demo-hud-row' }, h('span', { text: key }), h('span', { text: '= ' }), value);
+    const stat = (key: string, value: HTMLElement) => h('span', { class: 'demo-stat' }, h('span', { class: 'demo-key', text: key }), ' = ', value);
     this.hud = {
       state: h('span', { class: 'demo-state', text: 'BOOTING' }),
-      links: h('span', { text: '0' }),
-      match: h('span', { text: '0.00' }),
+      links: h('span', { class: 'demo-value', text: '0' }),
+      match: h('span', { class: 'demo-value', text: '0.00' }),
     };
+    this.body = h('div', { class: 'demo-body' }, this.text);
     this.element = h(
-      'div',
-      { class: 'demo', attrs: { 'aria-hidden': 'true' } },
-      this.text,
-      h('div', { class: 'demo-hud' }, row('crawler.state', this.hud.state), row('links_found', this.hud.links), row('best_match', this.hud.match)),
+      'figure',
+      { class: 'demo-card panel', attrs: { 'aria-hidden': 'true' } },
+      h(
+        'figcaption',
+        { class: 'demo-bar' },
+        h('span', { class: 'demo-live', text: 'live · crawler.demo' }),
+        h('span', { class: 'demo-hud' }, stat('crawler.state', this.hud.state), stat('links_found', this.hud.links), stat('best_match', this.hud.match)),
+      ),
+      this.body,
     );
   }
 
   /** Starts the animation (call once the element is in the document). */
   start(): void {
     if (this.stage) return;
-    const stage = new Stage(this.element);
+    const stage = new Stage(this.body);
     this.stage = stage;
     void this.run(stage).catch((error) => {
       if (!(error instanceof StageClosedError)) console.error(error);
@@ -59,14 +68,14 @@ export class TitleDemo {
   private async run(stage: Stage): Promise<void> {
     // Wait for layout (fonts, size).
     while (stage.width < 50) await stage.frame();
-    const rootBox = () => this.element.getBoundingClientRect();
+    const rootBox = () => this.body.getBoundingClientRect();
     const words = new WordIndex((rect) => {
       const r = rootBox();
       return { left: rect.left - r.left, top: rect.top - r.top, right: rect.right - r.left, bottom: rect.bottom - r.top };
     });
     const relayout = () => {
       // reset() indexes the text blocks inside the element it is given.
-      words.reset(this.element);
+      words.reset(this.body);
       words.ensure({ left: -1e4, right: 1e4, top: -1e4, bottom: 1e4 });
     };
     relayout();
