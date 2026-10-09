@@ -12,6 +12,8 @@ export interface PathStep {
   at: number;
   /** How the racer got here. */
   via: 'start' | 'link' | 'back';
+  /** Optional annotation (the spider records why it chose the link). */
+  note?: string;
 }
 
 export interface RacerState {
@@ -58,11 +60,11 @@ export class Race {
    * Records a move. Returns true when this move reaches the target; the first
    * racer to do so becomes the winner.
    */
-  move(who: Racer, title: string, via: 'link' | 'back' = 'link'): boolean {
+  move(who: Racer, title: string, via: 'link' | 'back' = 'link', note?: string): boolean {
     const r = this.racer(who);
     if (this.isDone(who)) return false;
     const at = this.clock.elapsed();
-    r.path.push({ title, at, via });
+    r.path.push({ title, at, via, ...(note ? { note } : {}) });
     r.hops++;
     if (title !== this.targetTitle) return false;
     r.finishedAt = at;
@@ -70,11 +72,15 @@ export class Race {
     return true;
   }
 
+  /** The racer abandons (player gave up, spider stuck). The other can still win by arriving. */
   retire(who: Racer): void {
     const r = this.racer(who);
     if (r.finishedAt === null) r.retired = true;
-    // If one racer retires, the other one wins by default once it arrives;
-    // we do not award the win here so that the end screen can say "gave up".
+  }
+
+  /** True when nobody can move any more. */
+  get over(): boolean {
+    return this.isDone('player') && this.isDone('spider');
   }
 
   current(who: Racer): string {

@@ -7,7 +7,7 @@ import './styles/base.css';
 import './styles/article.css';
 import './styles/screens.css';
 
-import { DEFAULT_DIFFICULTY, DIFFICULTIES } from './game/difficulty';
+import { DEFAULT_DIFFICULTY, DIFFICULTIES, isDifficultyId, type DifficultyId } from './game/difficulty';
 import type { ValidatedPair } from './game/pairs';
 import { LexicalRanker } from './spider/ai/lexical';
 import { FallbackRanker, SemanticRanker } from './spider/ai/semantic';
@@ -22,15 +22,36 @@ const client = new WikiClient();
 const store = new ArticleStore(client);
 
 // The embedding model is shared by every race: it loads in the background
-// (a Web Worker) as soon as the game opens, and its vectors stay cached.
+// (in a Web Worker) as soon as the game opens, and its vectors stay cached.
 const embedder = new WorkerEmbedder();
 const ranker = new FallbackRanker(new SemanticRanker(embedder), new LexicalRanker());
 embedder.load().catch(() => {
-  // The spider falls back to lexical ranking; the HUD badge says so.
+  // The spider falls back to word matching; its HUD badge says so.
 });
+
+const DIFFICULTY_KEY = 'silk.difficulty';
+
+/** Remembered per browser; storage may be unavailable (private mode...). */
+function savedDifficulty(): DifficultyId {
+  try {
+    const value = localStorage.getItem(DIFFICULTY_KEY);
+    return isDifficultyId(value) ? value : DEFAULT_DIFFICULTY;
+  } catch {
+    return DEFAULT_DIFFICULTY;
+  }
+}
+
+function saveDifficulty(id: DifficultyId): void {
+  try {
+    localStorage.setItem(DIFFICULTY_KEY, id);
+  } catch {
+    // Not important.
+  }
+}
 
 let currentRace: RaceScreen | null = null;
 let lastPair: ValidatedPair | null = null;
+let difficulty: DifficultyId = savedDifficulty();
 
 function showSetup(): void {
   currentRace?.destroy();
@@ -40,9 +61,15 @@ function showSetup(): void {
       client,
       initialStart: lastPair?.start.title,
       initialTarget: lastPair?.target.title,
-      onStart: ({ pair }) => startRace(pair),
+      initialDifficulty: difficulty,
+      onStart: (choice) => {
+        difficulty = choice.difficulty;
+        saveDifficulty(difficulty);
+        startRace(choice.pair);
+      },
     }),
   );
+  app.querySelector<HTMLInputElement>('#field-start')?.focus();
 }
 
 function startRace(pair: ValidatedPair): void {
@@ -54,7 +81,7 @@ function startRace(pair: ValidatedPair): void {
     ranker,
     embedder,
     pair,
-    difficulty: DIFFICULTIES[DEFAULT_DIFFICULTY],
+    difficulty: DIFFICULTIES[difficulty],
     onExit: showSetup,
     onRematch: () => startRace(pair),
   });

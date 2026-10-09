@@ -15,8 +15,8 @@ export interface SpiderRunnerOptions {
   difficulty: Difficulty;
   /** True when a load error means the article does not exist. */
   isMissing: (error: unknown) => boolean;
-  /** The spider landed on a new page (after its transition started). */
-  onMove: (title: string, via: 'link' | 'back') => void;
+  /** The spider moved to a new page; `reason` says why it chose the link. */
+  onMove: (title: string, via: 'link' | 'back', reason?: Decision['reason']) => void;
   /** The spider is on the target page (called after its celebration). */
   onArrive?: () => void;
   onStuck?: (reason: string) => void;
@@ -50,6 +50,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class SpiderRunner {
   private stopped = false;
+  private prepared = false;
 
   constructor(private readonly options: SpiderRunnerOptions) {}
 
@@ -57,10 +58,24 @@ export class SpiderRunner {
     this.stopped = true;
   }
 
+  /**
+   * Loads the start page (with its link data) and shows it with the spider
+   * dropping in, so that the race can start the moment the countdown ends.
+   */
+  async prepare(startTitle: string): Promise<void> {
+    const { pane, agent } = this.options;
+    pane.setStatus('Spinning up…');
+    const start = await this.retrying(() => agent.start(startTitle));
+    if (this.stopped) return;
+    await pane.enter(start.loaded);
+    this.prepared = true;
+  }
+
   /** Runs until the spider arrives, gets stuck, or the runner is stopped. */
   async run(startTitle: string): Promise<void> {
     try {
-      await this.loop(startTitle);
+      if (!this.prepared) await this.prepare(startTitle);
+      await this.loop();
     } catch (error) {
       if (error instanceof PaneClosedError || this.stopped) return;
       this.options.pane.setStatus('Crashed into a network error');
@@ -68,12 +83,8 @@ export class SpiderRunner {
     }
   }
 
-  private async loop(startTitle: string): Promise<void> {
+  private async loop(): Promise<void> {
     const { pane, agent, difficulty } = this.options;
-    pane.setStatus('Spinning up…');
-    const start = await this.retrying(() => agent.start(startTitle));
-    await pane.enter(start.loaded);
-
     while (!this.stopped) {
       pane.setStatus('Indexing links…');
       const move = await pane.think(difficulty.thinkMs, agent.think());
@@ -94,7 +105,7 @@ export class SpiderRunner {
         pane.setStatus('Dead end: climbing back up the thread');
         const hole = await pane.retreat();
         const page = agent.retreat();
-        this.options.onMove(page.title, 'back');
+        this.options.onMove(page.title, 'back', 'dead-end');
         await pane.enter(page.loaded, hole);
         continue;
       }
@@ -116,7 +127,7 @@ export class SpiderRunner {
       if (this.stopped) return;
       const hole = await pane.dive();
       agent.follow(link, page);
-      this.options.onMove(page.title, 'link');
+      this.options.onMove(page.title, 'link', decision.reason);
       await pane.enter(page.loaded, hole);
     }
   }
