@@ -3,56 +3,63 @@ import { inTriangle, rayExit } from '../../src/attacks/attacks';
 import type { Box } from '../../src/stage/stage';
 import { segmentHitsBox } from '../../src/spider/actor';
 import { legBend } from '../../src/spider/rig';
-import { cameraTarget, planWalk, wordsAroundLink } from '../../src/spider/route';
+import { approach, cameraTarget, serpentine } from '../../src/spider/route';
 
 const box = (left: number, top: number, right: number, bottom = top + 20): Box => ({ left, top, right, bottom });
 
-describe('wordsAroundLink', () => {
-  it('keeps only the words of the link line, split left and right', () => {
-    const link = box(200, 100, 260);
-    const words = [box(10, 100, 50), box(60, 100, 120), box(270, 100, 300), box(10, 130, 50), box(130, 101, 190)];
-    expect(wordsAroundLink(link, words)).toEqual({ before: [0, 1, 4], after: [2] });
+describe('approach', () => {
+  const link = box(400, 300, 480);
+
+  it('comes at the link along its line, from the side the spider is on', () => {
+    const fromLeft = approach(link, { x: 100, y: 120 }, 15);
+    expect(fromLeft.end).toEqual({ x: 387, y: 310 });
+    expect(fromLeft.runIn).toEqual({ x: 317, y: 310 });
+    const fromRight = approach(link, { x: 900, y: 600 }, 15);
+    expect(fromRight.end).toEqual({ x: 493, y: 310 });
+    expect(fromRight.runIn).toEqual({ x: 563, y: 310 });
+  });
+
+  it('does not hug the left margin: the run along the line is short', () => {
+    const { runIn, end } = approach(link, { x: 10, y: 900 }, 15);
+    expect(end.x - runIn.x).toBeLessThanOrEqual(70);
+  });
+
+  it('just walks on when already on the line', () => {
+    expect(approach(link, { x: 200, y: 312 }, 15).runIn).toEqual({ x: 200, y: 312 });
   });
 });
 
-describe('planWalk', () => {
-  const mouth = 18;
+describe('serpentine', () => {
+  const a = { x: 0, y: 0 };
+  const b = { x: 0, y: 600 };
 
-  it('walks rightwards through the words before the link, eating them in order', () => {
-    const link = box(200, 100, 260);
-    const before = [box(10, 100, 50), box(60, 100, 120), box(130, 100, 190)];
-    const plan = planWalk(link, before, [box(270, 100, 300)], mouth);
-    expect(plan.direction).toBe(1);
-    expect(plan.start.x).toBeLessThan(10);
-    expect(plan.end.x + mouth).toBeCloseTo(202);
-    expect(plan.start.y).toBe(110);
-    expect(plan.eats.map((e) => e.index)).toEqual([0, 1, 2]);
-    expect(plan.eats.every((e) => e.side === 'before')).toBe(true);
+  it('ends exactly where it is going, in small steps', () => {
+    const path = serpentine(a, b);
+    expect(path[path.length - 1]).toEqual(b);
+    for (let i = 1; i < path.length; i++) expect(Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y)).toBeLessThan(12);
   });
 
-  it('walks leftwards when the link starts its line', () => {
-    const link = box(10, 100, 60);
-    const after = [box(70, 100, 100), box(110, 100, 150)];
-    const plan = planWalk(link, [], after, mouth);
-    expect(plan.direction).toBe(-1);
-    expect(plan.start.x).toBeGreaterThan(150);
-    expect(plan.end.x - mouth).toBeCloseTo(58);
-    // The farthest word is met first.
-    expect(plan.eats.map((e) => e.index)).toEqual([1, 0]);
+  it('swings from side to side like a snake, within bounds', () => {
+    const xs = serpentine(a, b).map((p) => p.x);
+    expect(Math.max(...xs)).toBeGreaterThan(30);
+    expect(Math.min(...xs)).toBeLessThan(-30);
+    expect(Math.max(...xs.map(Math.abs))).toBeLessThanOrEqual(56);
   });
 
-  it('eats at most maxWords, the closest to the link', () => {
-    const link = box(500, 0, 540);
-    const before = Array.from({ length: 12 }, (_, i) => box(i * 40, 0, i * 40 + 30));
-    const plan = planWalk(link, before, [], mouth, 4);
-    expect(plan.eats.map((e) => e.index)).toEqual([8, 9, 10, 11]);
-    expect(plan.start.x).toBeLessThan(320);
+  it('starts and arrives straight', () => {
+    const path = serpentine(a, b);
+    expect(Math.abs(path[0].x)).toBeLessThan(1);
+    expect(Math.abs(path[path.length - 2].x)).toBeLessThan(1);
   });
 
-  it('still produces a short walk when the line has no other word', () => {
-    const plan = planWalk(box(100, 0, 150), [], [], mouth);
-    expect(plan.eats).toEqual([]);
-    expect(plan.end.x - plan.start.x).toBeGreaterThanOrEqual(mouth);
+  it('walks short trips straight', () => {
+    expect(serpentine(a, { x: 0, y: 50 }).every((p) => p.x === 0)).toBe(true);
+  });
+
+  it('can swing to either side first', () => {
+    const left = serpentine(a, { x: 0, y: 200 }, { side: 1 });
+    const right = serpentine(a, { x: 0, y: 200 }, { side: -1 });
+    expect(Math.sign(left[10].x)).toBe(-Math.sign(right[10].x));
   });
 });
 

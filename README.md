@@ -124,10 +124,12 @@ may crush it: the word cracks and its pieces drop off the line. One hop is:
 1. **scan**: rays from the eye to every visible link while the brain decides; the SPIDER.BRAIN panel
    shows the best scores;
 2. **crawl & eat**: the eye laser locks the link (slicing words on the way), then the spider goes
-   there **on foot**, breaking into a run when the link is far, and eats every word under its body,
-   leaving a swath of destroyed text; on the way it randomly lasers a word in half, sweeps the laser
-   along a line, plucks a word and throws it off the page (`yeet()`), or stomps one to pieces (`THUD`).
-   Only a link very far down the page gets a **web zip** (a silk line, then one long jump);
+   there **on foot**, weaving from side to side like a snake, breaking into a run when the link is far,
+   and straightens out for a short run along the link's line, from whichever side it comes. It eats
+   every word under its body, leaving a swath of destroyed text; on the way it randomly lasers a word
+   in half, sweeps the laser along a line, plucks a word and throws it off the page (`yeet()`), or
+   stomps one to pieces (`THUD`). While it thinks it paces about, eating as it goes. Only a link very
+   far down the page gets a **web zip** (a silk line, then one long jump);
 3. **grab**: the legs wrap the link, the link lights up and the pane edges glitch;
 4. **hop**: it dives in, the page glitches out in RGB-split slices, the next article glitches in,
    and the spider drops in on its silk thread.
