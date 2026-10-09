@@ -67,24 +67,23 @@ function drawText(ctx: CanvasRenderingContext2D, lines: Line[], options: { title
   }
 }
 
+/** Feet stand on the text bars (a leg with no bar within reach stays up). */
 function groundOf(lines: Line[], rig: SpiderRig): Ground {
   return {
-    hold(desired: Point): Foothold {
-      let best: Box | null = null;
-      let bestD = rig.reach * 0.35;
+    hold(desired: Point, accept?: (p: Point) => boolean): Foothold | null {
+      let best: Point | null = null;
+      let bestD = rig.reach * 0.5;
       for (const line of lines) {
         for (const w of line.words) {
-          const dx = Math.max(w.left - desired.x, 0, desired.x - w.right);
-          const dy = Math.max(w.top - desired.y, 0, desired.y - w.bottom);
-          const d = Math.hypot(dx, dy);
-          if (d < bestD) {
+          const p = { x: Math.min(Math.max(desired.x, w.left + 3), w.right - 3), y: (w.top + w.bottom) / 2 };
+          const d = Math.hypot(p.x - desired.x, p.y - desired.y);
+          if (d < bestD && (!accept || accept(p))) {
             bestD = d;
-            best = w;
+            best = p;
           }
         }
       }
-      if (!best) return { point: desired, word: null };
-      return { point: { x: Math.min(Math.max(desired.x, best.left + 3), best.right - 3), y: (best.top + best.bottom) / 2 }, word: null };
+      return best ? { point: best, word: null } : null;
     },
   };
 }
@@ -97,7 +96,7 @@ function spider(x: number, y: number, lines: Line[], size = 0.72, facing?: Point
   rig.visible = true;
   if (facing) {
     rig.face(facing);
-    rig.tilt = rig.targetTilt;
+    rig.heading = rig.targetHeading;
   }
   rig.plantAll(groundOf(lines, rig));
   return rig;
@@ -185,12 +184,12 @@ const PAINTERS: Record<IllustrationKind, (ctx: CanvasRenderingContext2D) => void
     rig.x = 340;
     rig.y = 84;
     rig.visible = true;
-    // Head down on its thread, the eye towards where it drops.
-    rig.tilt = rig.targetTilt = Math.PI;
+    // Hanging on its thread, the eye towards where it drops.
+    rig.heading = rig.targetHeading = Math.PI;
     rig.pose = 'hang';
     rig.liftAll();
     rig.update(0.5);
-    drawSilk(ctx, [{ x: 340, y: 0 }, rig.spinneret()], 0.9);
+    drawSilk(ctx, [{ x: 340, y: 0 }, rig.top()], 0.9);
     rig.draw(ctx);
     caption(ctx, '+1 HOP · hops: 7', RED, true);
   },
@@ -258,13 +257,32 @@ const PAINTERS: Record<IllustrationKind, (ctx: CanvasRenderingContext2D) => void
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
+    // The word cracked: a dotted trace where it stood, its pieces falling.
     ctx.save();
-    ctx.translate(c.x, c.y + 4);
-    ctx.scale(1.3, 0.35);
+    ctx.strokeStyle = 'rgba(240, 244, 248, 0.4)';
+    ctx.setLineDash([2, 3]);
+    ctx.beginPath();
+    ctx.moveTo(word.left, word.bottom + 2);
+    ctx.lineTo(word.right, word.bottom + 2);
+    ctx.stroke();
+    ctx.restore();
+    ctx.save();
     ctx.font = `600 22px "Source Serif 4", Charter, Georgia, serif`;
-    ctx.fillStyle = RED;
+    ctx.fillStyle = LINE;
     ctx.textAlign = 'center';
-    ctx.fillText('the', 0, 0);
+    ctx.textBaseline = 'middle';
+    for (const [text, dx, dy, turn] of [
+      ['t', -13, 20, -0.5],
+      ['h', 1, 38, 0.35],
+      ['e', 15, 27, 0.9],
+    ] as const) {
+      ctx.save();
+      ctx.translate(c.x + dx, c.y + dy);
+      ctx.rotate(turn);
+      ctx.globalAlpha = 0.85;
+      ctx.fillText(text, 0, 0);
+      ctx.restore();
+    }
     ctx.restore();
     drawLabel(ctx, 'THUD', c.x + 50, c.y - 44, LINE, { boxed: false });
     caption(ctx, 'stomp(word)', CYAN);

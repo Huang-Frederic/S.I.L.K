@@ -17,7 +17,7 @@ export interface Word {
   box: Box;
   /** The link this word belongs to, if any. */
   link: HTMLAnchorElement | null;
-  /** Eaten, thrown, sliced or squashed: no longer a foothold or a meal. */
+  /** Eaten, thrown, sliced, crushed or burned: no longer a foothold or a meal. */
   gone: boolean;
 }
 

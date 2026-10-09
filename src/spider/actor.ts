@@ -85,7 +85,7 @@ export class SpiderActor implements Drawable {
   holds = 0;
   /** False during sequences that must not be cut (page transitions). */
   interruptible = true;
-  /** Words destroyed so far (eaten, sliced, thrown, squashed). */
+  /** Words destroyed so far (eaten, sliced, thrown, crushed, burned). */
   wordsEaten = 0;
   /** Status line in the spider's pane (`eat("approach") · words_eaten: 37`). */
   status = '';
@@ -95,8 +95,6 @@ export class SpiderActor implements Drawable {
   /** Dragline behind the spider (surface coordinates). */
   private trail: Point[] = [];
   private hangFrom: Point | null = null;
-  /** Where the hanging thread is attached: the spinneret (head down) or the head. */
-  private threadEnd: 'spinneret' | 'top' = 'spinneret';
   /** The link the spider is heading for: its feet do not crush it. */
   private protectedLink: HTMLAnchorElement | null = null;
   private zipLine: { from: Point; to: Point; t: number } | null = null;
@@ -204,7 +202,7 @@ export class SpiderActor implements Drawable {
     rig.carried = null;
     rig.grabBox = null;
     rig.scale = 1;
-    rig.targetTilt = rig.tilt;
+    rig.tilt = 0;
     this.zipLine = null;
     this.hangFrom = null;
     this.protectedLink = null;
@@ -320,7 +318,7 @@ export class SpiderActor implements Drawable {
 
     if (rig.visible) {
       if (this.trail.length > 1) drawSilk(ctx, [...this.trail, rig.spinneret()], 0.4);
-      if (this.hangFrom) drawSilk(ctx, [this.hangFrom, this.threadEnd === 'top' ? rig.top() : rig.spinneret()], 0.85);
+      if (this.hangFrom) drawSilk(ctx, [this.hangFrom, rig.top()], 0.85);
     }
     if (this.zipLine) {
       const { from, to, t } = this.zipLine;
@@ -367,10 +365,10 @@ export class SpiderActor implements Drawable {
   // ------------------------------------------------------------------ ground
 
   /**
-   * Feet snap to the nearest word (among those the leg may reach, see
-   * `accept`); on bare paper they land where they aim.
+   * Feet only stand on words: the nearest one a leg may reach (see
+   * `accept`), or none (the leg is then held up).
    */
-  private footHold(desired: Point, accept?: (p: Point) => boolean): Foothold {
+  private footHold(desired: Point, accept?: (p: Point) => boolean): Foothold | null {
     const pane = this.surface;
     if (!pane) return { point: desired, word: null };
     const article = pane.articleBox();
@@ -381,9 +379,8 @@ export class SpiderActor implements Drawable {
     };
     pane.words.ensure({ left: p.x - 140, right: p.x + 140, top: p.y - 100, bottom: p.y + 100 });
     const on = (b: Box) => ({ x: clamp(p.x, b.left + 3, b.right - 3), y: b.top + (b.bottom - b.top) * 0.62 });
-    const word = pane.words.nearest(p, this.rig.reach * 0.32, (w) => !w.gone && (!accept || accept(on(w.box))));
-    if (!word) return { point: p, word: null };
-    return { point: on(word.box), word };
+    const word = pane.words.nearest(p, this.rig.reach * 0.5, (w) => !w.gone && (!accept || accept(on(w.box))));
+    return word ? { point: on(word.box), word } : null;
   }
 
   /** A foot landing on a word may crush it: the spider breaks everything in its path. */
@@ -392,20 +389,19 @@ export class SpiderActor implements Drawable {
     if (!pane || word.gone || this.rig.pose !== 'stand') return false;
     if (this.protectedLink && word.link === this.protectedLink) return false;
     if (Math.random() >= this.speeds().crush) return false;
-    this.destroyWord(word, 'squashed');
-    this.fragments.burst(pane.toStage(center(word.box)), { count: 3, colors: [LINE, RED], speed: [10, 40], life: [0.15, 0.3], gravity: 40 });
+    this.crumbleWord(word);
     return true;
   }
 
   /** Unit vector of where the eye points. */
   private heading(): Point {
-    return { x: Math.sin(this.rig.tilt), y: -Math.cos(this.rig.tilt) };
+    return { x: Math.sin(this.rig.heading), y: -Math.cos(this.rig.heading) };
   }
 
   // --------------------------------------------------------------- damage
 
   /** Destroys a word (of the current pane by default) and counts it. */
-  destroyWord(word: Word, kind: 'eaten' | 'hole' | 'squashed' | 'burned' = 'eaten', pane: RacerPane | null = this.surface): void {
+  destroyWord(word: Word, kind: 'eaten' | 'hole' | 'crumbled' | 'burned' = 'eaten', pane: RacerPane | null = this.surface): void {
     if (word.gone) return;
     word.gone = true;
     word.el.classList.add(kind === 'eaten' ? EATEN_CLASS : `sw-${kind}`);
@@ -518,6 +514,95 @@ export class SpiderActor implements Drawable {
     this.fragments.burst(at, { count: 12, colors: [RED, '#FFD6DA', LINE], speed: [30, 120], life: [0.15, 0.35], gravity: 140 });
   }
 
+  /**
+   * A word gives way under a foot: it cracks, and its pieces drop off the
+   * line, tumbling, in a puff of dust. Its place stays empty (the text never
+   * reflows).
+   */
+  crumbleWord(word: Word): void {
+    const pane = this.surface;
+    if (!pane || word.gone) return;
+    const style = getComputedStyle(word.el);
+    const font = style.font || `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    const color = style.color;
+    const text = word.el.textContent ?? '';
+    const box = { ...word.box };
+    const generation = pane.generation;
+    this.destroyWord(word, 'crumbled');
+    // Chunks of one to three letters, laid out like the word was.
+    const measure = this.stage.ctx;
+    measure.save();
+    measure.font = font;
+    const stretch = (box.right - box.left) / Math.max(1, measure.measureText(text).width);
+    const pieces: Array<{ text: string; x: number; y: number; w: number; vx: number; vy: number; angle: number; spin: number; delay: number }> = [];
+    for (let i = 0, x = box.left; i < text.length; ) {
+      const n = Math.min(text.length - i, 1 + Math.floor(Math.random() * 3));
+      const chunk = text.slice(i, i + n);
+      const w = measure.measureText(chunk).width * stretch;
+      pieces.push({
+        text: chunk,
+        x,
+        y: (box.top + box.bottom) / 2,
+        w,
+        // A small jolt, then they drop.
+        vx: (Math.random() - 0.5) * 50,
+        vy: -10 - Math.random() * 35,
+        angle: 0,
+        spin: (Math.random() - 0.5) * 7,
+        delay: Math.random() * 0.08,
+      });
+      x += w;
+      i += n;
+    }
+    measure.restore();
+    const life = 0.9;
+    let t = 0;
+    this.stage.add({
+      z: Z.projectiles,
+      update: (dt) => {
+        t += dt;
+        for (const p of pieces) {
+          if (t < p.delay) continue;
+          p.vy += 1400 * dt;
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.angle += p.spin * dt;
+        }
+        return t < life && pane.generation === generation;
+      },
+      draw: (ctx) => {
+        pane.enterContent(ctx);
+        ctx.font = font;
+        ctx.textBaseline = 'middle';
+        // The crack, for a split second.
+        if (t < 0.09) {
+          const mid = (box.top + box.bottom) / 2;
+          ctx.strokeStyle = LINE;
+          ctx.globalAlpha = 1 - t / 0.09;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          for (let i = 0; i <= 4; i++) {
+            const x = box.left + ((box.right - box.left) * i) / 4;
+            const y = mid + (i % 2 ? -4 : 4);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        }
+        ctx.fillStyle = color;
+        for (const p of pieces) {
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, Math.min(1, (life - t) / 0.35));
+          ctx.translate(p.x + p.w / 2, p.y);
+          ctx.rotate(p.angle);
+          ctx.fillText(p.text, -p.w / 2, 1);
+          ctx.restore();
+        }
+      },
+    });
+    this.fragments.burst(pane.toStage(center(box)), { count: 6, colors: ['#8A939E', LINE], speed: [10, 50], life: [0.25, 0.5], gravity: 120 });
+  }
+
   /** A beam from the eye to a point of the current space. */
   private beam(to: () => Point, seconds: number, width = 2): void {
     const start = this.stage.time;
@@ -541,19 +626,19 @@ export class SpiderActor implements Drawable {
     rig.x = spot.x;
     rig.y = startY;
     rig.scale = 1;
-    // Head down on its dragline, the eye towards where it drops.
-    rig.tilt = rig.targetTilt = Math.PI;
+    // Hanging on its dragline, the eye towards where it drops.
+    rig.tilt = 0;
+    rig.heading = rig.targetHeading = Math.PI;
     rig.pose = 'hang';
     rig.fold = 0.5;
     rig.liftAll();
     rig.visible = true;
     this.hangFrom = { x: spot.x, y: view.top - 2 };
-    this.threadEnd = 'spinneret';
     await this.tween(this.d(0.45), (t) => (rig.y = lerp(startY, spot.y, easeOutBack(t))));
     rig.pose = 'stand';
     rig.plantAll(this.ground);
     await this.tween(this.d(0.14), (t) => (rig.fold = 0.5 * (1 - t)));
-    this.trail = [this.hangFrom, rig.spinneret()];
+    this.trail = [this.hangFrom, rig.top()];
     this.hangFrom = null;
   }
 
@@ -787,8 +872,8 @@ export class SpiderActor implements Drawable {
     if (!word) return;
     this.status = `stomp("${textOf(word.el)}")`;
     await this.tween(this.d(0.08), (t) => (rig.scale = 1 + 0.08 * t));
-    this.destroyWord(word, 'squashed');
     const spot = center(word.box);
+    this.crumbleWord(word);
     shockwave(this.stage, () => pane.toStage(spot));
     this.stage.shake(3.5);
     await this.tween(this.d(0.1), (t) => (rig.scale = 1.08 - 0.08 * t));
@@ -859,8 +944,7 @@ export class SpiderActor implements Drawable {
     const box = pane.linkBox(anchor);
     const c = center(box);
     this.lockOn = null;
-    // Rears up over the link, upright, before wrapping its legs round it.
-    await this.turnTo(UP, this.d(0.25));
+    rig.face(UP);
     rig.pose = 'grab';
     rig.grabBox = box;
     anchor.classList.add('is-grabbed');
@@ -964,11 +1048,10 @@ export class SpiderActor implements Drawable {
     const pane = this.surface;
     if (!pane) return;
     const rig = this.rig;
-    // Turns round and climbs head first.
-    await this.turnTo(UP, this.d(0.3));
+    // Looks up, and climbs back up its thread.
+    rig.face(UP);
     const top = pane.visibleContent().top - 80;
     this.hangFrom = { x: rig.x, y: top + 76 };
-    this.threadEnd = 'top';
     rig.pose = 'hang';
     rig.liftAll();
     rig.fold = 0.5;
@@ -1142,9 +1225,8 @@ export class SpiderActor implements Drawable {
     rig.grabBox = null;
     rig.carried = null;
     const y = rig.y;
-    const base = rig.tilt;
     await this.stage.tween(settings.duration(dramatic ? 0.7 : 0.45), (t) => {
-      rig.tilt = rig.targetTilt = base + (dramatic ? 0.42 : 0.2) * easeOutBack(t);
+      rig.tilt = (dramatic ? 0.42 : 0.2) * easeOutBack(t);
       rig.y = y + 12 * t;
     });
     if (dramatic) this.stage.shake(5);

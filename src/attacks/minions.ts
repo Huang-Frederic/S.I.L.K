@@ -143,7 +143,7 @@ export function releaseMinis(ctx: AttackContext, pane: RacerPane, at: Point, cou
     const angle = (i / count) * Math.PI * 2 + Math.random() * 0.8;
     const scatter = { x: at.x + Math.cos(angle) * (40 + Math.random() * 30), y: at.y + Math.sin(angle) * (26 + Math.random() * 20) };
     rig.face({ x: scatter.x - at.x, y: scatter.y - at.y });
-    rig.tilt = rig.targetTilt;
+    rig.heading = rig.targetHeading;
     brood.minis.push({ rig, target: null, scatter, eaten: 0, age: 0, dying: 0 });
   }
   let all = broods.get(ctx.stage);

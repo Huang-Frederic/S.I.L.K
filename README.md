@@ -106,24 +106,27 @@ use stage coordinates and cross the gutter freely.
 
 Words are wrapped in spans lazily, only near the spider or under the fan laser (`WordIndex`), so long
 articles stay light. Destroyed words keep their box (dashed outline, strike-through, 20 % ink, a
-dashed hole for thrown words, a squashed glyph for stomped or crushed ones, red embers for burned
+dashed hole for thrown words, a faint dotted trace where a crushed word cracked and fell, red embers for burned
 ones), so the text never reflows under the player's cursor.
 
 ### The spider (`src/spider/rig.ts`, `actor.ts`, `runner.ts`)
 
-The rig follows the mockups' rig sheet: a plain outlined body with one red eye, eight 1.5 px legs
-placed by two-bone inverse kinematics, feet that snap to words (each planted foot boxes its word in
-cyan) and re-plant past 90 % stretch in a tetrapod gait. The body turns to face where it goes (the eye
-leads, and it drops into a page head first), sways with its stride, and every step is a little
-different. Each leg owns an angular sector around the body, so legs never pass over or under each
-other, even in a U-turn at a run. A foot landing on a word may crush it. One hop is:
+The rig follows the mockups' rig sheet: a plain outlined body with one red eye and eight 1.5 px legs
+placed by two-bone inverse kinematics. The body stays upright (it never spins round): its eye slides
+round the inside of the body to face where it goes, looking down as it drops into a page on its
+thread. Each leg owns a sector around the body and its hip, knee and foot never leave it, so legs
+never pass over or under each other. Feet only ever stand on words (each planted foot boxes its word
+in cyan); a leg with no word within reach is held up rather than gripping thin air. The legs walk in
+an alternating tetrapod paced by the distance covered, each foot landing far enough ahead to stay
+balanced around its resting spot, and settle back when the spider stops. A foot landing on a word
+may crush it: the word cracks and its pieces drop off the line. One hop is:
 
 1. **scan**: rays from the eye to every visible link while the brain decides; the SPIDER.BRAIN panel
    shows the best scores;
 2. **crawl & eat**: the eye laser locks the link (slicing words on the way), then the spider goes
    there **on foot**, breaking into a run when the link is far, and eats every word under its body,
    leaving a swath of destroyed text; on the way it randomly lasers a word in half, sweeps the laser
-   along a line, plucks a word and throws it off the page (`yeet()`), or stomps one flat (`THUD`).
+   along a line, plucks a word and throws it off the page (`yeet()`), or stomps one to pieces (`THUD`).
    Only a link very far down the page gets a **web zip** (a silk line, then one long jump);
 3. **grab**: the legs wrap the link, the link lights up and the pane edges glitch;
 4. **hop**: it dives in, the page glitches out in RGB-split slices, the next article glitches in,

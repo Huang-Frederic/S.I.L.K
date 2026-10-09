@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { inTriangle, rayExit } from '../../src/attacks/attacks';
 import type { Box } from '../../src/stage/stage';
 import { segmentHitsBox } from '../../src/spider/actor';
-import { solveKnee } from '../../src/spider/rig';
+import { legBend } from '../../src/spider/rig';
 import { cameraTarget, planWalk, wordsAroundLink } from '../../src/spider/route';
 
 const box = (left: number, top: number, right: number, bottom = top + 20): Box => ({ left, top, right, bottom });
@@ -64,25 +64,23 @@ describe('cameraTarget', () => {
   });
 });
 
-describe('solveKnee (two-bone IK)', () => {
+describe('legBend (two-bone IK)', () => {
   const hip = { x: 0, y: 0 };
 
-  it('keeps both segment lengths', () => {
-    const foot = { x: 60, y: 20 };
-    const knee = solveKnee(hip, foot, 40, 40, { x: -10, y: -10 });
-    expect(Math.hypot(knee.x - hip.x, knee.y - hip.y)).toBeCloseTo(40);
-    expect(Math.hypot(foot.x - knee.x, foot.y - knee.y)).toBeCloseTo(40);
-  });
-
-  it('bends away from the body', () => {
-    const foot = { x: 60, y: 0 };
-    expect(solveKnee(hip, foot, 40, 40, { x: 30, y: 10 }).y).toBeLessThan(0);
-    expect(solveKnee(hip, foot, 40, 40, { x: 30, y: -10 }).y).toBeGreaterThan(0);
+  it('puts the knee over the hip-foot line where both segments meet', () => {
+    const { base, height } = legBend(hip, { x: 60, y: 0 }, 40, 40);
+    expect(base.x).toBeCloseTo(30);
+    expect(base.y).toBeCloseTo(0);
+    // The knee stands off the line so that both segments keep their length.
+    expect(Math.hypot(base.x - hip.x, height)).toBeCloseTo(40);
   });
 
   it('stretches straight towards an unreachable foot', () => {
-    const knee = solveKnee(hip, { x: 200, y: 0 }, 40, 40, { x: 0, y: 10 });
-    expect(knee).toEqual({ x: 40, y: 0 });
+    expect(legBend(hip, { x: 200, y: 0 }, 40, 40)).toMatchObject({ base: { x: 40, y: 0 }, height: 0 });
+  });
+
+  it('bends more as the foot comes closer', () => {
+    expect(legBend(hip, { x: 30, y: 0 }, 40, 40).height).toBeGreaterThan(legBend(hip, { x: 70, y: 0 }, 40, 40).height);
   });
 });
 
