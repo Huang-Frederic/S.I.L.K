@@ -18,7 +18,7 @@ describe('HttpQueue', () => {
   it('never runs more than maxConcurrent requests at once', async () => {
     const { fetchFn, pending } = controllableFetch();
     const queue = new HttpQueue({ fetchFn, maxConcurrent: 3 });
-    const results = ['a', 'b', 'c', 'd', 'e'].map((id) => queue.getText(`https://x/${id}`));
+    const results = ['a', 'b', 'c', 'd', 'e'].map((id) => queue.getText(`https://x/${id}`, { priority: true }));
     await flush();
     expect(pending).toHaveLength(3);
     expect(queue.inFlight).toBe(3);
@@ -36,6 +36,19 @@ describe('HttpQueue', () => {
     expect(texts).toHaveLength(5);
   });
 
+  it('keeps one slot free for priority requests', async () => {
+    const { fetchFn, pending } = controllableFetch();
+    const queue = new HttpQueue({ fetchFn, maxConcurrent: 3 });
+    for (const id of ['a', 'b', 'c', 'd']) void queue.getText(`https://x/${id}`);
+    await flush();
+    // The spider's background traffic uses two slots at most...
+    expect(pending.map((p) => p.url)).toEqual(['https://x/a', 'https://x/b']);
+    // ...so the player's click starts at once.
+    void queue.getText('https://x/click', { priority: true });
+    await flush();
+    expect(pending.map((p) => p.url)).toEqual(['https://x/a', 'https://x/b', 'https://x/click']);
+  });
+
   it('runs priority requests before queued ones', async () => {
     const { fetchFn, pending } = controllableFetch();
     const queue = new HttpQueue({ fetchFn, maxConcurrent: 1 });
@@ -47,6 +60,42 @@ describe('HttpQueue', () => {
     await flush();
     await flush();
     expect(pending[0].url).toBe('https://x/urgent');
+  });
+
+  it('promotes a queued request when a priority caller asks for it', async () => {
+    const { fetchFn, pending } = controllableFetch();
+    const queue = new HttpQueue({ fetchFn, maxConcurrent: 1 });
+    void queue.getText('https://x/first');
+    void queue.getText('https://x/spider-1');
+    const prefetched = queue.getText('https://x/page');
+    // The player clicks the page the spider had queued.
+    const clicked = queue.getText('https://x/page', { priority: true });
+    expect(clicked).toBe(prefetched);
+    await flush();
+    pending.shift()!.resolve(new Response('1'));
+    await flush();
+    await flush();
+    expect(pending[0].url).toBe('https://x/page');
+  });
+
+  it("does not hold the player's first try behind a 429 back-off", async () => {
+    const sleeps: number[] = [];
+    let now = 0;
+    const queue = new HttpQueue({
+      now: () => now,
+      sleep: async (ms) => {
+        sleeps.push(ms);
+        now += ms;
+      },
+      fetchFn: async (url) => (url.endsWith('busy') && now < 5000 ? new Response('slow down', { status: 429, headers: { 'retry-after': '5' } }) : new Response('ok')),
+    });
+    await queue.getText('https://x/busy');
+    expect(sleeps).toEqual([5000]);
+    now = 1000; // still inside the 5 s back-off window
+    await queue.getText('https://x/click', { priority: true });
+    expect(sleeps).toEqual([5000]);
+    await queue.getText('https://x/background');
+    expect(sleeps).toEqual([5000, 4000]);
   });
 
   it('caches responses and shares in-flight requests', async () => {

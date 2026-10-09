@@ -9,7 +9,7 @@ import type { Box, Point } from './stage';
 export const WORD_CLASS = 'sw';
 export const EATEN_CLASS = 'sw-eaten';
 
-const TEXT_BLOCKS = 'p, li, dd, dt, td, th, caption, blockquote, pre, h1, h2, h3, h4, h5, h6, .wiki-hatnote, .wiki-subtitle';
+export const TEXT_BLOCKS = 'p, li, dd, dt, td, th, caption, blockquote, pre, h1, h2, h3, h4, h5, h6, .wiki-hatnote, .wiki-subtitle';
 
 export interface Word {
   el: HTMLElement;
@@ -57,13 +57,24 @@ export function wrapWords(block: Element): HTMLElement[] {
 export class WordIndex {
   private words: Word[] = [];
   private blocks: Array<{ el: Element; box: Box; wrapped: boolean }> = [];
+  /** Article whose blocks are not measured yet (measuring forces a layout). */
+  private pending: Element | null = null;
 
   constructor(private readonly toContent: ToContent) {}
 
-  /** Starts over on a new article. */
+  /**
+   * Starts over on a new article. Nothing is measured until words are
+   * needed, so showing an article (the player's clicks) stays cheap.
+   */
   reset(root: Element | null): void {
     this.words = [];
     this.blocks = [];
+    this.pending = root;
+  }
+
+  private measureBlocks(): void {
+    const root = this.pending;
+    this.pending = null;
     if (!root) return;
     for (const el of Array.from(root.querySelectorAll(TEXT_BLOCKS))) {
       // Nested blocks are covered by their outermost text block.
@@ -84,6 +95,7 @@ export class WordIndex {
 
   /** Makes sure every word of the blocks intersecting `region` is indexed. */
   ensure(region: Box): void {
+    if (this.pending) this.measureBlocks();
     let added = false;
     for (const block of this.blocks) {
       if (block.wrapped || block.box.bottom < region.top || block.box.top > region.bottom) continue;
@@ -136,6 +148,7 @@ export class WordIndex {
 
   /** Recomputes boxes after a layout change (resize). */
   relayout(): void {
+    if (this.pending) return; // measured on first use anyway
     for (const block of this.blocks) block.box = this.toContent(block.el.getBoundingClientRect());
     for (const w of this.words) {
       const rect = w.el.getClientRects()[0];

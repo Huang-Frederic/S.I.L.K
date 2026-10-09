@@ -108,6 +108,8 @@ export class RaceScreen {
   private playerNearTarget = false;
   private brain: { head: string; rows: BrainRow[] } = { head: '', rows: [] };
   private clockText = '';
+  /** Link under the cursor, and since when (prefetch after a short hover). */
+  private hovered: { anchor: HTMLAnchorElement; since: number; fetched: boolean } | null = null;
   private readonly removeFrameHook: () => void;
   private resizeObserver: ResizeObserver | null = null;
   private readonly onVisibility = () => this.handleVisibility();
@@ -120,6 +122,15 @@ export class RaceScreen {
     for (const pane of this.panes) {
       pane.onLinkClick = (title, anchor) => this.onLinkClick(pane, title, anchor);
       pane.onBack = () => this.goBack();
+      // Touch has no hover: start loading on touch down, the click follows.
+      pane.scroller.addEventListener(
+        'pointerdown',
+        (event) => {
+          const anchor = (event.target as Element | null)?.closest?.<HTMLAnchorElement>('a.wiki-link');
+          if (anchor && pane.owner === 'player' && this.phase === 'racing') this.prefetch(anchor);
+        },
+        { passive: true },
+      );
     }
 
     this.clockEl = h('span', { class: 'hud-clock', text: '00:00', attrs: { role: 'timer', 'aria-label': 'Race time' } });
@@ -380,7 +391,11 @@ export class RaceScreen {
     const root = this.stage.rootRect;
     const el = document.elementFromPoint(p.x + root.left, p.y + root.top);
     const anchor = el?.closest<HTMLAnchorElement>('a.wiki-link');
-    if (!anchor || !pane.scroller.contains(anchor)) return;
+    if (!anchor || !pane.scroller.contains(anchor)) {
+      this.hovered = null;
+      return;
+    }
+    this.prefetchHovered(anchor);
     const box = pane.boxToStage(pane.linkBox(anchor));
     const usable = pane.usable(anchor);
     strokeBox(ctx, box, usable ? AMBER : RED, { dash: [3, 3], pad: 3 });
@@ -397,6 +412,27 @@ export class RaceScreen {
     ctx.fillStyle = '#F0F4F8';
     ctx.textBaseline = 'middle';
     ctx.fillText(label, x + 11, y + 17.5);
+  }
+
+  /**
+   * Starts loading the article behind a link once the cursor has rested on
+   * it briefly, so that the click itself feels instant. Decoys are skipped:
+   * they lead nowhere.
+   */
+  private prefetchHovered(anchor: HTMLAnchorElement): void {
+    if (this.hovered?.anchor !== anchor) {
+      this.hovered = { anchor, since: this.stage.time, fetched: false };
+      return;
+    }
+    if (this.hovered.fetched || this.stage.time - this.hovered.since < 0.08) return;
+    this.hovered.fetched = true;
+    this.prefetch(anchor);
+  }
+
+  private prefetch(anchor: HTMLAnchorElement): void {
+    const title = anchor.dataset.title;
+    if (!title || anchor.dataset.decoy || !this.playerPane.usable(anchor)) return;
+    this.options.store.load(title, { priority: true }).catch(() => {});
   }
 
   /** While the cursor is dragged, clicks land where the dragged cursor is. */

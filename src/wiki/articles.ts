@@ -22,7 +22,11 @@ export class ArticleStore {
   load(title: string, options: { priority?: boolean } = {}): Promise<LoadedArticle> {
     const key = normalizeTitle(title);
     const cached = this.byTitle.get(key);
-    if (cached) return cached;
+    if (cached) {
+      // Maybe still queued behind the spider's traffic: the player wants it now.
+      if (options.priority) this.client.prioritizeArticle(key);
+      return cached;
+    }
 
     const promise = this.client.fetchArticle(key, options).then((fetched) => {
       const article = sanitizeArticle(fetched.html, { title: fetched.title });

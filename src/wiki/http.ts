@@ -1,7 +1,10 @@
 /**
  * A small HTTP layer shared by every Wikipedia request:
  *  - at most `maxConcurrent` requests in flight (Wikimedia asks for <= 3),
- *  - an in-memory cache keyed by URL (in-flight requests are shared too),
+ *    one of them kept free for priority requests (the player's clicks) so
+ *    that the spider's background traffic never makes the player wait,
+ *  - an in-memory cache keyed by URL (in-flight requests are shared too; a
+ *    queued request is promoted when a priority caller asks for it),
  *  - polite retries with back-off on 429 / 5xx / network errors,
  *  - the `Api-User-Agent` header identifying the game.
  */
@@ -65,6 +68,13 @@ export function parseRetryAfter(value: string | null, now = Date.now()): number 
   return Number.isNaN(date) ? null : Math.max(0, date - now);
 }
 
+/** A request waiting for (or holding) a slot. */
+interface Job {
+  url: string;
+  priority: boolean;
+  start: () => void;
+}
+
 export class HttpQueue {
   private readonly fetchFn: FetchFn;
   private readonly maxConcurrent: number;
@@ -74,7 +84,7 @@ export class HttpQueue {
   private readonly now: () => number;
 
   private active = 0;
-  private readonly waiting: Array<() => void> = [];
+  private readonly waiting: Job[] = [];
   private readonly cache = new Map<string, Promise<FetchedText>>();
   /** Global pause after a 429 so that we stop hammering the API. */
   private backoffUntil = 0;
@@ -97,9 +107,12 @@ export class HttpQueue {
   getText(url: string, options: RequestOptions = {}): Promise<FetchedText> {
     if (!options.noCache) {
       const cached = this.cache.get(url);
-      if (cached) return cached;
+      if (cached) {
+        if (options.priority) this.promote(url);
+        return cached;
+      }
     }
-    const promise = this.schedule(() => this.fetchWithRetry(url, options.maxRetries ?? this.maxRetries), options.priority ?? false);
+    const promise = this.schedule(url, (job) => this.fetchWithRetry(url, options.maxRetries ?? this.maxRetries, job), options.priority ?? false);
     if (!options.noCache) {
       this.cache.set(url, promise);
       // Failed requests must not poison the cache.
@@ -119,26 +132,62 @@ export class HttpQueue {
     }
   }
 
-  private schedule<T>(task: () => Promise<T>, priority: boolean): Promise<T> {
+  /** Moves a queued request ahead of the background traffic (the player wants it now). */
+  promote(url: string): void {
+    const index = this.waiting.findIndex((job) => job.url === url);
+    if (index < 0) return;
+    const [job] = this.waiting.splice(index, 1);
+    job.priority = true;
+    this.enqueue(job);
+    this.pump();
+  }
+
+  /** Background requests leave one slot free for priority ones. */
+  private get backgroundLimit(): number {
+    return this.maxConcurrent > 1 ? this.maxConcurrent - 1 : this.maxConcurrent;
+  }
+
+  private schedule<T>(url: string, task: (job: Job) => Promise<T>, priority: boolean): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      const run = () => {
-        this.active++;
-        task()
-          .then(resolve, reject)
-          .finally(() => {
-            this.active--;
-            this.waiting.shift()?.();
-          });
+      const job: Job = {
+        url,
+        priority,
+        start: () => {
+          this.active++;
+          task(job)
+            .then(resolve, reject)
+            .finally(() => {
+              this.active--;
+              this.pump();
+            });
+        },
       };
-      if (this.active < this.maxConcurrent) run();
-      else if (priority) this.waiting.unshift(run);
-      else this.waiting.push(run);
+      this.enqueue(job);
+      this.pump();
     });
   }
 
-  private async fetchWithRetry(url: string, maxRetries: number): Promise<FetchedText> {
+  /** Priority jobs wait in arrival order, ahead of every background job. */
+  private enqueue(job: Job): void {
+    const firstBackground = this.waiting.findIndex((other) => !other.priority);
+    if (job.priority && firstBackground >= 0) this.waiting.splice(firstBackground, 0, job);
+    else this.waiting.push(job);
+  }
+
+  private pump(): void {
+    while (this.waiting.length) {
+      const next = this.waiting[0];
+      if (this.active >= (next.priority ? this.maxConcurrent : this.backgroundLimit)) return;
+      this.waiting.shift();
+      next.start();
+    }
+  }
+
+  private async fetchWithRetry(url: string, maxRetries: number, job: Job): Promise<FetchedText> {
     for (let attempt = 0; ; attempt++) {
-      const wait = this.backoffUntil - this.now();
+      // After a 429 everybody waits, except the player's first try: one
+      // request is not hammering, and it is what the player is staring at.
+      const wait = job.priority && attempt === 0 ? 0 : this.backoffUntil - this.now();
       if (wait > 0) await this.sleep(wait);
 
       let response: Response;

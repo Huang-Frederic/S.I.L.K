@@ -56,7 +56,9 @@ export function createPageLoader(store: ArticleStore, client: WikiClient): PageL
     const loaded = await store.load(title);
     let resolution: LinkResolution | null = null;
     try {
-      resolution = await client.fetchLinkResolution(loaded.title);
+      // Two batches (1000 links) cover almost every page and keep the
+      // spider's background traffic light.
+      resolution = await client.fetchLinkResolution(loaded.title, 2);
     } catch {
       // The spider can still play with unresolved titles.
     }
