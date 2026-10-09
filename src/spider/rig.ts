@@ -10,8 +10,8 @@
  *    stay inside it, so legs never cross. The knees stick out towards the
  *    sides of the body.
  *  - Feet only ever stand on words (each planted foot boxes its word in
- *    cyan). A leg with no word within reach is held up off the page instead
- *    of gripping thin air.
+ *    cyan), and may tear up the word they let go of. A leg with no word
+ *    within reach is held up off the page instead of gripping thin air.
  *  - Gait: an alternating tetrapod (L1 R2 L3 R4 / R1 L2 R3 L4) paced by the
  *    distance walked: one group swings while the other stands, each foot
  *    landing far enough ahead that it stays balanced around its resting spot,
@@ -165,10 +165,10 @@ export class SpiderRig {
   /** Seconds, drives breathing, dancing and blinking. */
   time = 0;
   /**
-   * Called when a foot lands on a word; returns true when it crushed the
-   * word (the foot then holds nothing).
+   * Called when a foot lets go of the word it was gripping (as it steps
+   * away): the spider may tear it up.
    */
-  onPlant: ((word: Word) => boolean) | null = null;
+  onRelease: ((word: Word) => void) | null = null;
 
   private readonly legs: Leg[] = [];
   private lastX = 0;
@@ -409,6 +409,9 @@ export class SpiderRig {
     // Best a foothold the foot can keep for its whole stance, otherwise one it can land on.
     const lasts = (p: Point) => this.inSector(leg, p, -SLACK, end) && this.stretchAt(leg, p, end) <= OVERSTRETCH - 0.02;
     const hold = (dir && this.footholdFor(leg, desired, ground, shift, lasts)) || this.footholdFor(leg, desired, ground, shift);
+    // The foot lets go of the word it was gripping.
+    const held = leg.t >= 1 && !leg.lifted ? leg.word : null;
+    if (held && held !== hold?.word && !held.gone) this.onRelease?.(held);
     if (!hold) {
       this.holdUp(leg);
       return;
@@ -448,7 +451,6 @@ export class SpiderRig {
     leg.foot = { x: p.x + (out.x / len) * lift, y: p.y + (out.y / len) * lift };
     if (leg.t < 1) return;
     leg.foot = { ...to };
-    if (!leg.lifted && leg.word && this.onPlant?.(leg.word)) leg.word = null;
   }
 
   /** A planted foot that cannot stay where it is. */

@@ -7,7 +7,6 @@
 const KEYS = {
   reduceMotion: 'silk.reduceMotion',
   hardWins: 'silk.hardWins',
-  difficulty: 'silk.difficulty',
 } as const;
 
 function read(key: string): string | null {
@@ -64,13 +63,5 @@ export const settings = {
     const wins = this.hardWins + 1;
     write(KEYS.hardWins, String(wins));
     return wins;
-  },
-
-  get difficulty(): string | null {
-    return read(KEYS.difficulty);
-  },
-
-  set difficulty(value: string) {
-    write(KEYS.difficulty, value);
   },
 };

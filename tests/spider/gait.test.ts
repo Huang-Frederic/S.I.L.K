@@ -232,17 +232,22 @@ describe('SpiderRig walking on text', () => {
     }
   });
 
-  it('may crush the words it steps on', () => {
+  it('lets go of each word it gripped, and only those', () => {
     const ground = textGround();
     const rig = standing({ x: 0, y: 11 }, ground);
-    const crushed: Word[] = [];
-    rig.onPlant = (word) => {
-      crushed.push(word);
+    const gripped = new Set<Word>(rig.heldWords());
+    const released: Word[] = [];
+    rig.onRelease = (word) => {
+      released.push(word);
       word.gone = true;
-      return true;
     };
-    walk(rig, ground, [{ x: 600, y: 11 }], 125, () => {});
-    expect(crushed.length).toBeGreaterThan(4);
+    walk(rig, ground, [{ x: 600, y: 11 }], 125, () => {
+      for (const leg of rig.legGeometry()) if (leg.planted && leg.word) gripped.add(leg.word);
+    });
+    expect(released.length).toBeGreaterThan(10);
+    // (A foot may land and lift again within one frame, unseen.)
+    expect(released.filter((w) => gripped.has(w)).length / released.length).toBeGreaterThan(0.9);
+    // Torn-up words are never stood on again.
     expect(rig.heldWords().every((w) => !w.gone)).toBe(true);
   });
 });
