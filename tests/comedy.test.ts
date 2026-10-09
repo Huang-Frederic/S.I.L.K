@@ -79,8 +79,8 @@ describe('difficulty table', () => {
     expect([...DIFFICULTIES.hard.attacks].sort()).toEqual(['bombard', 'decoy', 'harass', 'laser', 'web']);
     expect(DIFFICULTIES.hard.cooldown).toEqual([4, 8]);
     expect(DIFFICULTIES.hard.rage).toBe('always');
-    // Link snatch: never on the first 3 links, once a race, not in the first minute.
-    expect(DIFFICULTIES.hard.snatch).toEqual({ safeHops: 3, perRace: 1, cooldown: 60 });
+    // Link snatch: never on the first 3 links, then at most one a minute.
+    expect(DIFFICULTIES.hard.snatch).toEqual({ safeHops: 3, cooldown: 60 });
     expect(DIFFICULTIES.hard.harassSeconds).toBe(2);
     expect(DIFFICULTIES.hard.harassGap).toBeGreaterThanOrEqual(40);
     expect(DIFFICULTIES.hard.maxDecoys).toBe(3);

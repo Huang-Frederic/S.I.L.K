@@ -8,10 +8,10 @@
  *  - the first racer on the target wins;
  *  - a fake link (Hard) leads nowhere: clicking it lets out mini-spiders
  *    that eat the player's links;
- *  - a link snatch (Hard, at most once a race) answers a click that would
- *    put the player ahead: the spider leaps across, eats that link, dives in,
- *    and the panes swap owners: the player carries on from the spider's
- *    former page;
+ *  - a link snatch (Hard, at most one a minute) answers a click that keeps
+ *    a winning player ahead: once the page behind it has loaded, the spider
+ *    leaps across, eats that link, dives in, and the panes swap owners: the
+ *    player carries on from the spider's former page;
  *  - when the spider wins it walks to the middle of the screen, eats the
  *    YOU badge and dances; when the player wins it collapses;
  *  - the race pauses while the browser tab is hidden.
@@ -25,7 +25,7 @@ import { TauntPicker, type TauntEvent } from '../game/comedy';
 import { RAGE, type Difficulty } from '../game/difficulty';
 import type { ValidatedPair } from '../game/pairs';
 import { Race } from '../game/race';
-import { linkCloseness, maySnatch, pageCloseness, type Lookup } from '../game/snatch';
+import { hopsLeft, maySnatch, snatchOpen, type LinkLike, type Lookup, type SnatchFacts, type Standing } from '../game/snatch';
 import { settings } from '../settings';
 import { SpiderActor } from '../spider/actor';
 import { SpiderAgent } from '../spider/ai/agent';
@@ -80,6 +80,8 @@ const BASE_TITLE = 'S.I.L.K: Spider Indexing Links & Knowledge';
 const MODEL_GRACE_MS = 8000;
 /** The player gets teased after this long without a move (s). */
 const SLOW_PLAYER = 22;
+/** How long a loaded page may wait for the spider's verdict on a snatch (ms). */
+const VERDICT_WAIT_MS = 300;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -303,7 +305,7 @@ export class RaceScreen {
       onMove: (title, via, note) => this.onSpiderMove(title, via, note),
       onSwap: (target, formerTitle) => this.swapPanes(target, formerTitle),
       onSnatchStart: () => this.cancelNavigation(),
-      onSnatch: (target) => this.say(this.isTarget(target.title) ? 'snatch-target' : 'snatch'),
+      onSnatch: () => this.say('snatch'),
       onArrive: () => void this.spiderWins(),
       onStuck: () => this.onSpiderStuck(),
     });
@@ -438,6 +440,8 @@ export class RaceScreen {
     const title = anchor.dataset.title;
     if (!title || anchor.dataset.decoy || !this.playerPane.usable(anchor)) return;
     this.options.store.load(title, { priority: true }).catch(() => {});
+    // The spider sizes the link up too, in case it wants to steal it.
+    if (this.snatchOpen()) void this.meaning([title]);
   }
 
   /** While the cursor is dragged, clicks land where the dragged cursor is. */
@@ -472,32 +476,66 @@ export class RaceScreen {
       this.clickDecoy(pane, anchor);
       return;
     }
-    if (!this.navBusy && this.trySnatch(pane, title, anchor)) return;
-    void this.navigate(title, 'link');
+    void this.navigate(title, 'link', anchor);
+  }
+
+  // ------------------------------------------------------------ link snatch
+
+  private raceSeconds(): number {
+    return this.race.clock.elapsed() / 1000;
+  }
+
+  /** Links the player has followed (back moves and swaps do not count). */
+  private playerLinks(): number {
+    return this.race.player.path.filter((step) => step.via === 'link').length;
+  }
+
+  /** Hard: past the player's first links and the cooldown, a snatch is possible. */
+  private snatchOpen(): boolean {
+    return snatchOpen(this.options.difficulty.snatch, { now: this.raceSeconds(), playerLinks: this.playerLinks(), lastAt: this.lastSnatchAt });
+  }
+
+  /** How close some titles are to the target in meaning (the spider's own ranker), by title. */
+  private meaning(titles: string[]): Promise<Map<string, number> | null> {
+    const profile = this.profile;
+    if (!profile) return Promise.resolve(null);
+    const links = [...new Set(titles)].map((title) => ({ title, linkedTitle: title, text: title, order: 0 }));
+    return this.options.ranker.rank(profile, links).then(
+      (ranked) => new Map(ranked.scored.map(({ link, score }) => [link.title, score])),
+      () => null,
+    );
   }
 
   /**
-   * Hard: the spider may steal the link the player just clicked, when that
-   * link would put the player ahead (rules in game/snatch.ts).
+   * Hard, once the page behind a clicked link has loaded: the spider may
+   * steal the link instead, when the player is winning (rules in
+   * game/snatch.ts). `odds` are the meaning scores asked for at click time.
+   * Resolves true when it pounced.
    */
-  private trySnatch(pane: RacerPane, title: string, anchor: HTMLAnchorElement): boolean {
+  private async stealsInstead(odds: Promise<Map<string, number> | null>, pane: RacerPane, anchor: HTMLAnchorElement, loaded: LoadedArticle): Promise<boolean> {
     const rule = this.options.difficulty.snatch;
+    const scores = await Promise.race([odds, sleep(VERDICT_WAIT_MS).then(() => null)]);
     const { runner, agent, profile } = this;
-    if (!rule || !runner?.canSnatch || !agent || !profile) return false;
+    const here = pane.view.article;
+    if (!runner?.canSnatch || !agent || !profile || !here || !anchor.isConnected || this.phase !== 'racing' || pane.owner !== 'player') return false;
     const lookup: Lookup = { isTarget: (t) => this.isTarget(t), isBridge: (t) => profile.backlinks.has(t) };
-    const now = this.race.clock.elapsed() / 1000;
-    const allowed = maySnatch(rule, {
-      now,
-      playerLinks: this.race.player.path.filter((step) => step.via === 'link').length,
-      done: this.snatches,
-      lastAt: this.lastSnatchAt,
-      link: linkCloseness(title, lookup),
-      spider: pageCloseness(agent.page.links, lookup),
-      visited: agent.brain.hasVisited(title),
+    const standing = (title: string, links: readonly LinkLike[], scoredAs = title): Standing => ({
+      hops: hopsLeft(title, links, lookup),
+      similarity: scores?.get(scoredAs) ?? null,
     });
-    if (!allowed || !runner.requestSnatch({ pane, anchor, title })) return false;
+    const clicked = anchor.dataset.title ?? loaded.title;
+    const facts: SnatchFacts = {
+      now: this.raceSeconds(),
+      playerLinks: this.playerLinks(),
+      lastAt: this.lastSnatchAt,
+      player: standing(here.title, linksOfBody(here.article.body)),
+      link: standing(loaded.title, linksOfBody(loaded.article.body), clicked),
+      spider: standing(agent.page.title, agent.page.links),
+      visited: agent.brain.hasVisited(loaded.title) || agent.brain.hasVisited(clicked),
+    };
+    if (!maySnatch(rule, facts) || !runner.requestSnatch({ pane, anchor, title: loaded.title })) return false;
     this.snatches++;
-    this.lastSnatchAt = now;
+    this.lastSnatchAt = facts.now;
     return true;
   }
 
@@ -514,7 +552,7 @@ export class RaceScreen {
     void this.navigate(this.history[this.history.length - 2], 'back');
   }
 
-  private async navigate(title: string, via: 'link' | 'back'): Promise<void> {
+  private async navigate(title: string, via: 'link' | 'back', anchor?: HTMLAnchorElement): Promise<void> {
     if (this.phase !== 'racing' || this.navBusy || this.race.isDone('player') || this.runner?.snatching) return;
     const pane = this.playerPane;
     const token = ++this.navToken;
@@ -522,10 +560,21 @@ export class RaceScreen {
     this.updateHeaders();
     pane.view.showLoading(`Loading “${title}”…`);
     const slow = setTimeout(() => token === this.navToken && pane.view.showLoading(`Still loading “${title}”… Wikipedia may be busy, retrying.`), 4000);
+    // Hard: the spider sizes the click up while the page loads.
+    const here = pane.view.article;
+    const odds = anchor && here && this.agent && this.snatchOpen() ? this.meaning([here.title, this.agent.page.title, title]) : null;
+    const stale = () => token !== this.navToken;
+    const offTrack = () => this.phase !== 'racing' || pane.owner !== 'player';
     try {
       const loaded = await this.options.store.load(title, { priority: true });
-      if (token !== this.navToken) return;
-      if (this.phase !== 'racing' || pane.owner !== 'player') {
+      if (stale()) return;
+      if (!offTrack() && odds && anchor && (await this.stealsInstead(odds, pane, anchor, loaded))) {
+        // The spider pounced on the link: the page is its now.
+        if (!stale()) pane.view.clearOverlay();
+        return;
+      }
+      if (stale()) return;
+      if (offTrack()) {
         pane.view.clearOverlay();
         return;
       }

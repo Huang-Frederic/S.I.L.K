@@ -30,7 +30,7 @@ system asks for it) removes screen shake and shortens transitions; it never chan
 | --- | --- |
 | **Easy** | Thinks slowly, crawls, and destroys its own page. Never touches yours. Winnable. |
 | **Normal** | Adds a **web trap** (links near your cursor can't be clicked for a few seconds), the **fan laser** (a big beam from its eye sweeps a fan across your page, centred on your cursor, and burns every word and link it passes over, its own page included) and a **word bombardment** (words from its page land on your links and cover them), about every 25 s. **Rage** when your page links to the target: faster, angrier, glowing eye, attacks twice as often. Hard but winnable. |
-| **Hard** | An attack every 4–8 s, chained (web, then the fan laser, then a bombardment…), with no warning, rage always on, near-instant thinking, and it sprints across the page smashing the text. **Decoys**: up to 3 fake target links in your text; click one and it bursts into mini-spiders that run for the links nearest your cursor and eat them (no time lost). **Cursor harassment**, now and then (at most once every 45 s): a silk line sticks to your cursor and drags it for 2 s. **Link snatch**, once a race: when you click a link that would put you ahead (the target, or a page that links to it, while the spider is further away), it leaps across, eats that link, dives in, and the panes swap owners: you continue from its page. Never on your first three links, never in the first minute. Expected win rate: almost zero. |
+| **Hard** | An attack every 4–8 s, chained (web, then the fan laser, then a bombardment…), with no warning, rage always on, near-instant thinking, and it sprints across the page smashing the text. **Decoys**: up to 3 fake target links in your text; click one and it bursts into mini-spiders that run for the links nearest your cursor and eat them (no time lost). **Cursor harassment**, now and then (at most once every 45 s): a silk line sticks to your cursor and drags it for 2 s. **Link snatch** when you are winning: if the link you click takes you closer to the target and leaves you closer than the spider, it leaps across, eats that link, dives in, and the panes swap owners: you continue from its page. Never on your first three links, never the last two links of a path (the target, or a page that links to it), and at most one snatch a minute. Expected win rate: almost zero. |
 
 Hard is meant as a show, not a fair fight: people should lose, laugh, and share the clip. The spider
 may burn, web or cover the target link and may leave you with nothing clickable for a while. There are
@@ -131,8 +131,11 @@ other, even in a U-turn at a run. A foot landing on a word may crush it. One hop
 
 The runner plays the agent's decisions with these moves and prefetches the next page while the spider
 crawls. Attacks (`src/attacks/`) are small coroutines picked by a director with cooldowns, chains and
-rage. The link snatch answers a click of the player's (its rules are a pure, tested module,
-`src/game/snatch.ts`) and interrupts the hop loop.
+rage. The link snatch answers a click of the player's, once the page behind it has loaded, and
+interrupts the hop loop. Its rules are a pure, tested module (`src/game/snatch.ts`): "closer to the
+target" is the spider's own estimate, first the hops left (1 from a page that links to the target, 2
+from a page that links to one of those, 3 otherwise), then, at equal hops, how close the page's title
+is to the target in meaning.
 
 All art (spider, effects, illustrations, logo, favicon) is drawn in code; there are no image assets
 and no bundled fonts (the mockups' fonts, Space Grotesk, Source Serif 4 and JetBrains Mono, are used

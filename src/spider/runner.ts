@@ -84,11 +84,6 @@ export class SpiderRunner {
     return this.started && !this.stopped && !this.snatching && !this.pendingSnatch && actor.interruptible && actor.visible && actor.holds === 0;
   }
 
-  /** True when the spider is one hop from the target (it will not leave for a snatch). */
-  get oneHopAway(): boolean {
-    return this.current?.reason === 'target';
-  }
-
   requestSnatch(target: SnatchTarget): boolean {
     if (!this.canSnatch) return false;
     this.pendingSnatch = target;

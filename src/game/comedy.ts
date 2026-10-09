@@ -9,7 +9,6 @@ export type TauntEvent =
   | 'start'
   | 'hop'
   | 'snatch'
-  | 'snatch-target'
   | 'player-near-target'
   | 'web'
   | 'laser'
@@ -28,7 +27,6 @@ export const TAUNTS: Record<TauntEvent, string[]> = {
   start: ['let’s dance.', 'eight legs. zero chill.', 'catch me if you can.'],
   hop: ['+1.', 'keep up.', 'next.', 'too easy.'],
   snatch: ['mine now.', 'nom.', 'yoink.', 'thanks for the link.'],
-  'snatch-target': ['you were so close.', 'mine now.', 'so close. not.'],
   'player-near-target': ['you were so close.', 'don’t even think about it.'],
   web: ['stuck?', 'sticky situation.'],
   laser: ['pew.', 'denied.', 'everything burns.', 'crispy.'],
