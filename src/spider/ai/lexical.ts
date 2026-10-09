@@ -9,11 +9,19 @@ import type { CandidateLink, Ranker, RankResult, ScoredLink, TargetProfile } fro
 
 const STOPWORDS = new Set(
   (
+    // English
     'a an and are as at be been but by for from has have he her his in into is it its of on or that the their ' +
     'there they this to was were which who will with not also than then these those other such may can one two ' +
-    'first new used use known most more many some about after before over under between during within without'
+    'first new used use known most more many some about after before over under between during within without ' +
+    // French (accents stripped, like the tokens)
+    'le la les de des du un une et en au aux dans par pour sur avec sans sous est sont ete etait qui que quoi dont ou ' +
+    'ce cet cette ces son sa ses leur leurs il elle ils elles on se ne pas plus ainsi aussi comme mais donc car entre ' +
+    'apres avant pendant depuis vers chez tres tout tous toute toutes autre autres meme deux premier premiere'
   ).split(' '),
 );
+
+/** Lists and indexes (English and French): broad, but rarely the way. */
+const LIST_PAGE = /^(List|Index|Outline) of |^(Liste|Index) (des?|du|d['’])/;
 
 /** Lower-cased, accent-free, stemmed content words. */
 export function tokenize(text: string): string[] {
@@ -77,7 +85,7 @@ export function lexicalScore(profile: LexicalProfile, link: CandidateLink, total
   const early = total > 1 ? 1 - link.order / total : 1;
   const words = link.title.split(' ').length;
   const broad = words <= 2 ? 0.05 : 0;
-  const penalty = (link.disambiguation ? 0.3 : 0) + (/^(List|Index|Outline) of /.test(link.title) ? 0.1 : 0) + (/^\d+$/.test(link.title) ? 0.1 : 0);
+  const penalty = (link.disambiguation ? 0.3 : 0) + (LIST_PAGE.test(link.title) ? 0.1 : 0) + (/^\d+$/.test(link.title) ? 0.1 : 0);
   return wordScore + shapeScore + 0.1 * early + broad - penalty;
 }
 

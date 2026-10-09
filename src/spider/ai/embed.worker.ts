@@ -2,7 +2,7 @@
  * Web Worker running the sentence-embedding model with transformers.js, so
  * that inference never stalls the spider's animation on the main thread.
  */
-import { MODEL_ID, TRANSFORMERS_URL, type EmbedRequest, type EmbedResponse } from './embedProtocol';
+import { TRANSFORMERS_URL, type EmbedRequest, type EmbedResponse } from './embedProtocol';
 
 interface Tensor {
   data: Float32Array | number[];
@@ -35,6 +35,8 @@ const scope = self as unknown as {
 };
 
 let extractor: Promise<FeatureExtractor> | null = null;
+/** The model this worker runs (set by the first `load` message). */
+let model = '';
 
 function load(): Promise<FeatureExtractor> {
   extractor ??= (async () => {
@@ -42,7 +44,7 @@ function load(): Promise<FeatureExtractor> {
     transformers.env.allowLocalModels = false;
     // Aggregate per-file download progress into one fraction.
     const files = new Map<string, { loaded: number; total: number }>();
-    return transformers.pipeline('feature-extraction', MODEL_ID, {
+    return transformers.pipeline('feature-extraction', model, {
       dtype: 'q8',
       progress_callback: (info) => {
         if (info.status !== 'progress' || !info.file || !info.total) return;
@@ -64,6 +66,7 @@ function load(): Promise<FeatureExtractor> {
 scope.onmessage = async (event) => {
   const request = event.data;
   if (request.type === 'load') {
+    model ||= request.model;
     try {
       await load();
       scope.postMessage({ type: 'ready' });

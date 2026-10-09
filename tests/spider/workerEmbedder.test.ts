@@ -25,7 +25,7 @@ class FakeWorker {
 
 function setup() {
   const worker = new FakeWorker();
-  const embedder = new WorkerEmbedder(() => worker as unknown as Worker);
+  const embedder = new WorkerEmbedder('test/model', () => worker as unknown as Worker);
   return { worker, embedder };
 }
 
@@ -36,7 +36,7 @@ describe('WorkerEmbedder', () => {
     embedder.onChange(() => changes.push(`${embedder.status}:${embedder.progress.toFixed(1)}`));
     const loading = embedder.load();
     expect(embedder.status).toBe('loading');
-    expect(worker.received).toEqual([{ type: 'load' }]);
+    expect(worker.received).toEqual([{ type: 'load', model: 'test/model' }]);
     worker.reply({ type: 'progress', fraction: 0.5 });
     worker.reply({ type: 'ready' });
     await loading;
@@ -76,7 +76,7 @@ describe('WorkerEmbedder', () => {
   });
 
   it('fails when the worker cannot even be created', async () => {
-    const embedder = new WorkerEmbedder(() => {
+    const embedder = new WorkerEmbedder('test/model', () => {
       throw new Error('Workers are disabled');
     });
     await expect(embedder.load()).rejects.toThrow('Workers are disabled');

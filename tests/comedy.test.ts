@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { pickRoast, roastLines, TAUNT_GAP, TauntPicker, TAUNTS } from '../src/game/comedy';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { pickRoast, roastLines, TAUNT_GAP, TauntPicker, taunts } from '../src/game/comedy';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES } from '../src/game/difficulty';
+import { LANGS, setLang } from '../src/i18n';
+
+beforeEach(() => setLang('en'));
 
 describe('taunts', () => {
   it('says at most one line every few seconds', () => {
@@ -31,13 +34,24 @@ describe('taunts', () => {
     expect(second).not.toBe(first);
   });
 
-  it('keeps every line short and lowercase', () => {
-    for (const lines of Object.values(TAUNTS)) {
-      for (const line of lines) {
-        expect(line.length).toBeLessThanOrEqual(40);
-        expect(line).toBe(line.toLowerCase());
+  it('keeps every line short and lowercase, in every language', () => {
+    for (const lang of LANGS) {
+      setLang(lang);
+      for (const lines of Object.values(taunts())) {
+        expect(lines.length).toBeGreaterThan(0);
+        for (const line of lines) {
+          expect(line.length).toBeLessThanOrEqual(40);
+          expect(line).toBe(line.toLowerCase());
+        }
       }
     }
+  });
+
+  it('speaks French in French', () => {
+    setLang('fr');
+    const picker = new TauntPicker(1, TAUNT_GAP, () => 0);
+    expect(picker.pick('snatch', 0)).toBe('à moi.');
+    expect(picker.pick('spider-wins', 1, true)).toBe('gg.');
   });
 });
 
@@ -60,6 +74,15 @@ describe('roasts', () => {
 
   it('teases an Easy loss', () => {
     expect(roastLines({ ...facts, difficulty: 'easy' })).toContain('Lost on Easy. The spider is telling everyone.');
+  });
+
+  it('roasts in French too, with French numbers and plurals', () => {
+    setLang('fr');
+    const lines = roastLines(facts);
+    expect(lines).toContain(`L’araignée a dévoré ${(2318).toLocaleString('fr-FR')} mots et ta dignité.`);
+    expect(lines).toContain('7 sauts. Zéro hésitation.');
+    expect(roastLines({ ...facts, spiderHops: 1, wordsEaten: 1 })).toContain('1 saut. Zéro hésitation.');
+    expect(roastLines({ ...facts, wordsEaten: 1 })).toContain('L’araignée a dévoré 1 mot et ta dignité.');
   });
 
   it('never mentions time penalties (there are none)', () => {

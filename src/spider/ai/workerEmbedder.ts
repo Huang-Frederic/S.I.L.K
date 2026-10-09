@@ -15,6 +15,8 @@ export class WorkerEmbedder implements Embedder {
   private readonly listeners = new Set<() => void>();
 
   constructor(
+    /** Hugging Face id of the model to run (see MODEL_IDS). */
+    private readonly model: string,
     private readonly createWorker: () => Worker = () =>
       new Worker(new URL('./embed.worker.ts', import.meta.url), { type: 'module', name: 'silk-embeddings' }),
   ) {}
@@ -73,7 +75,7 @@ export class WorkerEmbedder implements Embedder {
         this.fail(message);
         reject(new Error(message));
       };
-      worker.postMessage({ type: 'load' } satisfies EmbedRequest);
+      worker.postMessage({ type: 'load', model: this.model } satisfies EmbedRequest);
     });
     return this.loading;
   }

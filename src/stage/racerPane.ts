@@ -8,6 +8,7 @@
  * burned, eaten) and the decoys planted in it.
  */
 import type { Racer } from '../game/race';
+import { lang, t } from '../i18n';
 import { ArticleView } from '../ui/articleView';
 import { h } from '../ui/dom';
 import type { LoadedArticle } from '../wiki/articles';
@@ -80,29 +81,30 @@ export class RacerPane implements Surface {
     this.badge = h('span', { class: 'pane-badge' });
     this.hopsEl = h('strong', { text: '0' });
     this.crumbsEl = h('span', { class: 'pane-crumbs' });
+    const text = t().pane;
     this.backBtn = h('button', {
       class: 'pane-back',
-      text: '← back',
-      attrs: { type: 'button', title: 'Previous article (counts as a hop)' },
+      text: text.back,
+      attrs: { type: 'button', title: text.backHint },
       on: { click: () => this.onBack?.() },
     });
     this.brainHead = h('div', { class: 'brain-head' });
     this.brainRows = h('ol', { class: 'brain-rows' });
-    this.brainEl = h('div', { class: 'brain', attrs: { 'aria-label': "The spider's current reasoning" } }, this.brainHead, this.brainRows);
-    this.sourceLink = h('a', { text: 'View original', attrs: { target: '_blank', rel: 'noopener noreferrer' } });
-    this.authorsLink = h('a', { text: 'authors', attrs: { target: '_blank', rel: 'noopener noreferrer' } });
+    this.brainEl = h('div', { class: 'brain', attrs: { 'aria-label': text.reasoning } }, this.brainHead, this.brainRows);
+    this.sourceLink = h('a', { text: text.viewOriginal, attrs: { target: '_blank', rel: 'noopener noreferrer' } });
+    this.authorsLink = h('a', { text: text.authors, attrs: { target: '_blank', rel: 'noopener noreferrer' } });
     this.eatenEl = h('span', { class: 'pane-eaten' });
 
     this.element = h(
       'section',
       { class: `pane pane-${side}` },
-      h('header', { class: 'pane-head' }, this.badge, h('span', { class: 'pane-hops' }, 'hops ', this.hopsEl), this.backBtn, this.crumbsEl),
+      h('header', { class: 'pane-head' }, this.badge, h('span', { class: 'pane-hops' }, text.hops, this.hopsEl), this.backBtn, this.crumbsEl),
       this.brainEl,
       this.view.element,
       h(
         'footer',
         { class: 'pane-foot' },
-        'Text from Wikipedia, ',
+        text.textFrom,
         h('a', { text: 'CC BY-SA 4.0', attrs: { href: 'https://creativecommons.org/licenses/by-sa/4.0/', target: '_blank', rel: 'noopener noreferrer' } }),
         ' · ',
         this.sourceLink,
@@ -133,8 +135,9 @@ export class RacerPane implements Surface {
     const isPlayer = owner === 'player';
     this.element.classList.toggle('is-player', isPlayer);
     this.element.classList.toggle('is-spider', !isPlayer);
-    this.element.setAttribute('aria-label', isPlayer ? 'Your article' : "The spider's article");
-    this.badge.textContent = isPlayer ? 'YOU' : 'SPIDER';
+    const text = t().pane;
+    this.element.setAttribute('aria-label', isPlayer ? text.yourArticle : text.spiderArticle);
+    this.badge.textContent = isPlayer ? text.you : text.spider;
     this.badge.classList.remove('is-eaten');
     this.backBtn.hidden = !isPlayer;
     this.brainEl.hidden = isPlayer;
@@ -163,7 +166,7 @@ export class RacerPane implements Surface {
   }
 
   setWordsEaten(count: number): void {
-    this.eatenEl.textContent = ` · words eaten: ${count.toLocaleString('en-US')}`;
+    this.eatenEl.textContent = t().pane.wordsEaten(count);
   }
 
   setBrain(head: string, rows: BrainRow[]): void {
@@ -190,7 +193,7 @@ export class RacerPane implements Surface {
     this.view.render(loaded);
     this.damage.clear();
     this.words.reset(this.view.articleElement);
-    const url = wikipediaUrl(loaded.title);
+    const url = wikipediaUrl(loaded.title, lang());
     this.sourceLink.href = url;
     this.authorsLink.href = `${url}?action=history`;
   }

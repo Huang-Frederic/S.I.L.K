@@ -26,6 +26,7 @@ import { RAGE, type Difficulty } from '../game/difficulty';
 import type { ValidatedPair } from '../game/pairs';
 import { Race } from '../game/race';
 import { hopsLeft, maySnatch, snatchOpen, type LinkLike, type Lookup, type SnatchFacts, type Standing } from '../game/snatch';
+import { t } from '../i18n';
 import { settings } from '../settings';
 import { SpiderActor } from '../spider/actor';
 import { SpiderAgent } from '../spider/ai/agent';
@@ -144,8 +145,10 @@ export class RaceScreen {
       );
     }
 
-    this.clockEl = h('span', { class: 'hud-clock', text: '00:00', attrs: { role: 'timer', 'aria-label': 'Race time' } });
-    this.giveUpBtn = h('button', { class: 'btn btn-ghost hud-giveup', text: 'Give up', attrs: { type: 'button' }, on: { click: () => this.giveUp() } });
+    const text = t().race;
+    const level = t().difficulties[difficulty.id];
+    this.clockEl = h('span', { class: 'hud-clock', text: '00:00', attrs: { role: 'timer', 'aria-label': text.clock } });
+    this.giveUpBtn = h('button', { class: 'btn btn-ghost hud-giveup', text: text.giveUp, attrs: { type: 'button' }, on: { click: () => this.giveUp() } });
     this.giveUpBtn.disabled = true;
     this.overlay = h('div', { class: 'race-overlay' });
     this.liveEl = h('p', { class: 'visually-hidden', attrs: { 'aria-live': 'polite' } });
@@ -161,14 +164,14 @@ export class RaceScreen {
           'div',
           { class: 'hud-target', attrs: { title: pair.target.extract || pair.target.title } },
           icon('flag', 20),
-          h('span', { class: 'hud-target-label', text: 'Target' }),
+          h('span', { class: 'hud-target-label', text: text.target }),
           h('strong', { class: 'hud-target-title', text: pair.target.title }),
         ),
         h(
           'div',
           { class: 'hud-right' },
           this.clockEl,
-          h('span', { class: `hud-difficulty is-${difficulty.id}`, text: difficulty.label, attrs: { title: difficulty.blurb } }),
+          h('span', { class: `hud-difficulty is-${difficulty.id}`, text: level.label, attrs: { title: level.blurb } }),
           this.giveUpBtn,
         ),
       ),
@@ -246,7 +249,8 @@ export class RaceScreen {
   /** Loads everything both racers need, counts down, and starts the race. */
   async begin(): Promise<void> {
     const { client, store, pair, ranker, difficulty, embedder } = this.options;
-    const checklist = new Checklist(['Start article', 'Target backlinks', "Spider's brain"]);
+    const text = t().race;
+    const checklist = new Checklist(text.checklist);
     this.showOverlay(checklist.element);
 
     try {
@@ -257,7 +261,7 @@ export class RaceScreen {
         checklist.done(0, pair.start.title);
       });
       const target = buildTargetProfile(client, pair.target).then((p) => {
-        checklist.done(1, p.backlinks.size ? `${p.backlinks.size} pages link to it` : 'unavailable, similarity only');
+        checklist.done(1, p.backlinks.size ? text.linkingPages(p.backlinks.size) : text.noBacklinks);
         return p;
       });
       [, this.profile] = await Promise.all([start, target]);
@@ -267,12 +271,12 @@ export class RaceScreen {
         h(
           'div',
           { class: 'panel overlay-card is-error' },
-          h('p', { text: `Could not load the start article: ${errorMessage(error)}` }),
+          h('p', { text: text.startFailed(errorMessage(error)) }),
           h(
             'div',
             { class: 'overlay-actions' },
-            h('button', { class: 'btn btn-primary', text: 'Retry', on: { click: () => void this.begin() } }),
-            h('button', { class: 'btn btn-ghost', text: 'Back', on: { click: () => this.options.onExit() } }),
+            h('button', { class: 'btn btn-primary', text: text.retry, on: { click: () => void this.begin() } }),
+            h('button', { class: 'btn btn-ghost', text: text.back, on: { click: () => this.options.onExit() } }),
           ),
         ),
       );
@@ -280,16 +284,19 @@ export class RaceScreen {
     }
     if (this.destroyed) return;
     this.updatePlayerNear(this.playerPane.view.article);
+    // The spider's reasoning panel is there from the start (no jump when it fills in).
+    this.brain = { head: text.brainStart(this.race.targetTitle, this.profile!.backlinks.size), rows: [] };
+    this.spiderPane.setBrain(this.brain.head, this.brain.rows);
 
     // The model has been loading since the game opened; give it a moment.
     if (embedder.status === 'loading' || embedder.status === 'idle') {
-      const progress = () => checklist.pending(2, `loading model ${Math.round(embedder.progress * 100)}%`);
+      const progress = () => checklist.pending(2, text.modelLoading(Math.round(embedder.progress * 100)));
       progress();
       const stop = embedder.onChange(progress);
       await Promise.race([embedder.load().catch(() => {}), sleep(MODEL_GRACE_MS)]);
       stop();
     }
-    checklist.done(2, embedder.status === 'ready' ? 'semantic ranking (MiniLM)' : embedder.status === 'failed' ? 'word matching (model unavailable)' : 'word matching until the model is ready');
+    checklist.done(2, embedder.status === 'ready' ? text.modelReady : embedder.status === 'failed' ? text.modelFailed : text.modelLater);
 
     const profile = this.profile!;
     const agent = new SpiderAgent(new SpiderBrain(profile, ranker), createPageLoader(store, client));
@@ -361,9 +368,10 @@ export class RaceScreen {
 
   private async countdown(): Promise<void> {
     this.phase = 'countdown';
-    for (const step of ['3', '2', '1', 'GO']) {
-      this.showOverlay(h('div', { class: `countdown ${step === 'GO' ? 'is-go' : ''}`, text: step }));
-      await sleep(settings.duration(step === 'GO' ? 0.45 : 0.7) * 1000);
+    const go = t().race.go;
+    for (const step of ['3', '2', '1', go]) {
+      this.showOverlay(h('div', { class: `countdown ${step === go ? 'is-go' : ''}`, text: step }));
+      await sleep(settings.duration(step === go ? 0.45 : 0.7) * 1000);
       if (this.destroyed) return;
     }
     this.hideOverlay();
@@ -408,7 +416,7 @@ export class RaceScreen {
     const box = pane.boxToStage(pane.linkBox(anchor));
     const usable = pane.usable(anchor);
     strokeBox(ctx, box, usable ? AMBER : RED, { dash: [3, 3], pad: 3 });
-    const label = usable ? `hop ${this.race.player.hops + 1} → ${anchor.dataset.title ?? anchor.textContent ?? ''}` : `blocked · ${pane.damageOf(anchor)}`;
+    const label = usable ? t().race.hoverHop(this.race.player.hops + 1, anchor.dataset.title ?? anchor.textContent ?? '') : t().race.hoverBlocked(pane.damageOf(anchor));
     ctx.font = '500 13px "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace';
     const w = ctx.measureText(label).width + 22;
     const x = Math.min(Math.max(pane.rect.left + 4, box.left), pane.rect.right - w - 4);
@@ -560,8 +568,9 @@ export class RaceScreen {
     const token = ++this.navToken;
     this.navBusy = true;
     this.updateHeaders();
-    pane.view.showLoading(`Loading “${title}”…`);
-    const slow = setTimeout(() => token === this.navToken && pane.view.showLoading(`Still loading “${title}”… Wikipedia may be busy, retrying.`), 4000);
+    const text = t().race;
+    pane.view.showLoading(text.loading(title));
+    const slow = setTimeout(() => token === this.navToken && pane.view.showLoading(text.stillLoading(title)), 4000);
     // Hard: the spider sizes the click up while the page loads.
     const here = pane.view.article;
     const odds = anchor && here && this.agent && this.snatchOpen() ? this.meaning([here.title, this.agent.page.title, title]) : null;
@@ -588,11 +597,11 @@ export class RaceScreen {
       if (token !== this.navToken) return;
       const message =
         error instanceof ArticleNotFoundError
-          ? `“${title}” does not exist on Wikipedia (it may have been deleted). Pick another link.`
-          : `Could not load “${title}”: ${errorMessage(error)}`;
+          ? text.gone(title)
+          : text.loadFailed(title, errorMessage(error));
       pane.view.showError(message, [
-        { label: 'Retry', run: () => (pane.view.clearOverlay(), void this.navigate(title, via)) },
-        { label: 'Dismiss', run: () => pane.view.clearOverlay() },
+        { label: text.retry, run: () => (pane.view.clearOverlay(), void this.navigate(title, via)) },
+        { label: text.dismiss, run: () => pane.view.clearOverlay() },
       ]);
     } finally {
       clearTimeout(slow);
@@ -630,7 +639,7 @@ export class RaceScreen {
     if (this.attackCtx) releaseMinis(this.attackCtx, pane, at, this.options.difficulty.decoyMinis);
     this.stage.shake(3);
     this.say('decoy-clicked');
-    this.announce('Fake link! Mini-spiders are going for your links.');
+    this.announce(t().race.fakeLink);
   }
 
   private giveUp(): void {
@@ -661,12 +670,12 @@ export class RaceScreen {
   }
 
   private showBrain(decision: Decision, page: SpiderArticlePage): void {
-    const method = this.options.embedder.status === 'ready' ? '' : ' · word matching';
-    const head = `SPIDER.BRAIN · ${page.links.length} links scored · target = "${this.race.targetTitle}"${method}`;
+    const text = t().race;
+    const head = text.brain(page.links.length, this.race.targetTitle, this.options.embedder.status !== 'ready');
     const rows: BrainRow[] = decision.shortlist.slice(0, 3).map(({ link, score }) => ({
       title: link.title,
       score,
-      tag: this.isTarget(link.title) ? 'target ✓' : this.profile?.backlinks.has(link.title) ? 'backlink ✓' : undefined,
+      tag: this.isTarget(link.title) ? text.tagTarget : this.profile?.backlinks.has(link.title) ? text.tagBacklink : undefined,
     }));
     this.brain = { head, rows };
     this.spiderPane.setBrain(head, rows);
@@ -691,7 +700,7 @@ export class RaceScreen {
     }
     this.spiderPane.setBrain(this.brain.head, this.brain.rows);
     this.spiderPane.setWordsEaten(this.actor.wordsEaten);
-    this.announce('The spider stole your link. The panes swapped: you continue from its page.');
+    this.announce(t().race.swapped);
     this.updateHeaders();
   }
 
@@ -699,7 +708,7 @@ export class RaceScreen {
     this.race.retire('spider');
     this.director?.stop(true);
     this.say('spider-loses', true);
-    this.announce('The spider gave up.');
+    this.announce(t().race.spiderGaveUp);
   }
 
   // -------------------------------------------------------------- endings
@@ -734,7 +743,7 @@ export class RaceScreen {
     const badge = this.playerPane.badgeElement;
     try {
       await this.actor.walkOnStage({ x: this.stage.width / 2, y: this.stage.height * 0.52 }, settings.reduceMotion ? 900 : 520);
-      await this.actor.reelIn(badge, 'YOU', AMBER);
+      await this.actor.reelIn(badge, t().pane.you, AMBER);
       this.say(this.gaveUp ? 'give-up' : 'spider-wins', true);
       await this.actor.dance(settings.reduceMotion ? 1.4 : 2.6);
     } catch {
@@ -780,7 +789,7 @@ export class RaceScreen {
     const line = this.taunts.pick(event, this.stage.time, force);
     if (!line) return;
     this.bubble.show(line);
-    this.announce(`Spider: ${line}`);
+    this.announce(t().race.spiderSays(line));
   }
 
   private announce(text: string): void {
@@ -820,12 +829,12 @@ class Checklist {
 
   constructor(labels: string[]) {
     this.rows = labels.map((label) =>
-      h('li', { class: 'check is-pending' }, h('span', { class: 'check-mark' }), h('span', { class: 'check-label', text: label }), h('span', { class: 'check-detail', text: 'loading…' })),
+      h('li', { class: 'check is-pending' }, h('span', { class: 'check-mark' }), h('span', { class: 'check-label', text: label }), h('span', { class: 'check-detail', text: t().race.pending })),
     );
     this.element = h(
       'div',
       { class: 'checklist panel overlay-card', attrs: { role: 'status' } },
-      h('p', { class: 'kicker', text: 'crawler.boot()' }),
+      h('p', { class: 'kicker', text: t().race.boot }),
       h('ul', {}, ...this.rows),
     );
   }

@@ -20,6 +20,7 @@
  * uninterruptible (page transitions).
  */
 import { CYAN, drawLabel, drawLaser, drawSilk, flyWord, LINE, RED, shockwave, snakeCase, strokeBox, type Fragments } from '../fx/fx';
+import { t } from '../i18n';
 import { captureBars, EdgeGlitch, PageGlitch } from '../fx/glitch';
 import { settings } from '../settings';
 import type { RacerPane } from '../stage/racerPane';
@@ -27,7 +28,7 @@ import { Z, type Box, type Drawable, type Point, type Stage } from '../stage/sta
 import { EATEN_CLASS, type Word } from '../stage/wordIndex';
 import type { LoadedArticle } from '../wiki/articles';
 import { OPEN_GROUND, SpiderRig, type Foothold, type Ground } from './rig';
-import { approach, cameraTarget, serpentine } from './route';
+import { approach, cameraTarget, serpentine, type Column } from './route';
 
 export class Interrupted extends Error {
   constructor(readonly reason: string) {
@@ -79,6 +80,10 @@ const UP: Point = { x: 0, y: -1 };
 const MOUTH = 15;
 /** Trips this long (px) may be a web zip; longer ones are walked. */
 const ZIP_RANGE = [90, 380] as const;
+/** A long way, it may zip ahead along it, but always walks the last stretch (px). */
+const LAST_STRETCH = 300;
+/** From this far (px), it now and then zips ahead just to get there sooner. */
+const ZIP_AHEAD_FROM = 1200;
 
 /**
  * Moves the rig along a path, point after point: it speeds up into a walk
@@ -573,8 +578,7 @@ export class SpiderActor implements Drawable {
    * line, tumbling, in a puff of dust. Its place stays empty (the text never
    * reflows).
    */
-  crumbleWord(word: Word): void {
-    const pane = this.surface;
+  crumbleWord(word: Word, pane: RacerPane | null = this.surface): void {
     if (!pane || word.gone) return;
     const style = getComputedStyle(word.el);
     const font = style.font || `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
@@ -582,7 +586,7 @@ export class SpiderActor implements Drawable {
     const text = word.el.textContent ?? '';
     const box = { ...word.box };
     const generation = pane.generation;
-    this.destroyWord(word, 'crumbled');
+    this.destroyWord(word, 'crumbled', pane);
     // Chunks of one to three letters, laid out like the word was.
     const measure = this.stage.ctx;
     measure.save();
@@ -721,7 +725,7 @@ export class SpiderActor implements Drawable {
       const j = Math.floor(Math.random() * (i + 1));
       [links[i], links[j]] = [links[j], links[i]];
     }
-    this.status = `scanning ${linkCount} links…`;
+    this.status = t().spider.scanning(linkCount);
     const box: { done?: boolean } = {};
     work.then(
       () => (box.done = true),
@@ -775,7 +779,7 @@ export class SpiderActor implements Drawable {
       x: clamp(rig.x + Math.cos(angle) * reach, left, Math.max(left, right)),
       y: clamp(rig.y + Math.sin(angle) * reach, top, Math.max(top, bottom)),
     };
-    return serpentine({ x: rig.x, y: rig.y }, to, { side: Math.random() < 0.5 ? 1 : -1 });
+    return serpentine({ x: rig.x, y: rig.y }, to, { side: Math.random() < 0.5 ? 1 : -1, column: this.column(pane) });
   }
 
   /** Score labels next to the shortlisted links; the best one in cyan. */
@@ -829,19 +833,28 @@ export class SpiderActor implements Drawable {
    * Weaves its way to the link like a snake, bounding forward now and then
    * on a long way (a short one is sometimes a web zip instead), then
    * straightens out for a short run along the link's line, from the side it
-   * comes.
+   * comes. A long way it may zip ahead along the path, and it does whenever
+   * it would not otherwise make it by `deadline` (stage time), but never
+   * right onto the link: it always walks the last stretch.
    */
-  async crawlTo(anchor: HTMLAnchorElement): Promise<void> {
+  async crawlTo(anchor: HTMLAnchorElement, deadline = Infinity): Promise<void> {
     const pane = this.surface;
     if (!pane) return;
     this.protectedLink = anchor;
     const box = pane.linkBox(anchor);
     const here = { x: this.rig.x, y: this.rig.y };
-    const { runIn, end } = approach(box, here, MOUTH);
+    const column = this.column(pane);
+    const { runIn, end } = approach(box, here, MOUTH, 70, column);
     const far = distance(here, runIn);
     if (far >= ZIP_RANGE[0] && far <= ZIP_RANGE[1] && Math.random() < this.speeds().zipChance) await this.webZip(runIn, center(box));
-    else if (far > 1) await this.walk(serpentine(here, runIn, { side: Math.random() < 0.5 ? 1 : -1 }), anchor, true);
+    else if (far > 1) await this.walk(serpentine(here, runIn, { side: Math.random() < 0.5 ? 1 : -1, column }), anchor, true, deadline);
     await this.walk([end], anchor, false);
+  }
+
+  /** The text column the spider walks in (its feet need words). */
+  private column(pane: RacerPane): Column | undefined {
+    const article = pane.articleBox();
+    return article && article.right - article.left > 120 ? { left: article.left + 24, right: article.right - 24 } : undefined;
   }
 
   /**
@@ -858,21 +871,23 @@ export class SpiderActor implements Drawable {
     if (d > 60) {
       const k = Math.min(0.6, 260 / d);
       const stop = { x: here.x + (goal.x - here.x) * k, y: here.y + (goal.y - here.y) * k };
-      await this.walk(serpentine(here, stop, { side: Math.random() < 0.5 ? 1 : -1 }), anchor, true);
+      await this.walk(serpentine(here, stop, { side: Math.random() < 0.5 ? 1 : -1, column: this.column(pane) }), anchor, true);
     }
     this.lockOn = null;
     this.protectedLink = null;
-    this.status = `${snakeCase(title)}? no.`;
-    this.sayLabel('hmm…', LINE, 0.8);
+    this.status = t().spider.no(snakeCase(title));
+    this.sayLabel(t().spider.hmm, LINE, 0.8);
     await this.wiggle(0.35);
   }
 
   /**
    * Walks along a path, eating every word under its body. Far from the end it
    * breaks into a run (up to `sprint` times its walking speed) and slows
-   * down again as it gets close.
+   * down again as it gets close. A long way it now and then zips ahead along
+   * the path, and it does so whenever it would not make it by `deadline`
+   * (stage time) on foot, leaving its tricks aside.
    */
-  private async walk(path: Point[], exclude: HTMLAnchorElement | null, mischief: boolean): Promise<void> {
+  private async walk(path: Point[], exclude: HTMLAnchorElement | null, mischief: boolean, deadline = Infinity): Promise<void> {
     const route = new PathWalk(path);
     try {
       for (;;) {
@@ -887,10 +902,19 @@ export class SpiderActor implements Drawable {
         if (v < 0) break;
         this.speedNow = v;
         const left = route.left(this.rig);
-        if (mischief && left > 300 && Math.random() < sp.leaps * dt) {
+        if (!mischief) continue;
+        // About how fast it gets along on foot, tricks and swings included.
+        const pace = sp.walk * (1 + (sp.sprint - 1) * 0.8) * 0.7;
+        const late = this.stage.time + left / pace > deadline;
+        const room = left - LAST_STRETCH;
+        if (room > 160 && (late || (left > ZIP_AHEAD_FROM && Math.random() < sp.zipChance * 0.4 * dt))) {
+          const want = late ? left - (deadline - this.stage.time) * pace : 350 + Math.random() * 450;
+          await this.zipAhead(route, Math.min(room, clamp(want, 260, 1100)));
+          route.halt();
+        } else if (!late && left > 300 && Math.random() < sp.leaps * dt) {
           await this.bound(route, Math.min(left - 160, 110 + Math.random() * 100));
           route.halt();
-        } else if (mischief && left > 60 && Math.random() < sp.mischief * dt) {
+        } else if (!late && left > 60 && Math.random() < sp.mischief * dt) {
           await this.mischief(exclude);
           route.halt();
         }
@@ -898,6 +922,12 @@ export class SpiderActor implements Drawable {
     } finally {
       this.speedNow = 0;
     }
+  }
+
+  /** web.shoot(ahead).zip(): a silk line further down the way, and a long jump along it. */
+  private async zipAhead(route: PathWalk, length: number): Promise<void> {
+    const to = route.skip({ x: this.rig.x, y: this.rig.y }, length);
+    await this.webZip(to, to, 'web.shoot(ahead).zip()');
   }
 
   /**
@@ -936,11 +966,11 @@ export class SpiderActor implements Drawable {
   }
 
   /** web.shoot(link).zip(): a silk line to the link, then one long jump along it. */
-  private async webZip(to: Point, aim: Point): Promise<void> {
+  private async webZip(to: Point, aim: Point, status = 'web.shoot(link).zip()'): Promise<void> {
     const rig = this.rig;
     const from = { x: rig.x, y: rig.y };
     rig.face({ x: aim.x - from.x, y: aim.y - from.y });
-    this.status = 'web.shoot(link).zip()';
+    this.status = status;
     this.zipLine = { from: { ...from }, to: aim, t: 0 };
     await this.tween(this.d(0.16), (t) => this.zipLine && (this.zipLine.t = t));
     const mid = this.toStage({ x: lerp(from.x, aim.x, 0.5), y: lerp(from.y, aim.y, 0.5) });

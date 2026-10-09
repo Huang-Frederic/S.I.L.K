@@ -14,6 +14,7 @@
  *  - harassment:    silk sticks to the cursor and the spider tugs it
  */
 import { AMBER, CYAN, drawLabel, drawSilk, drawWeb, flyWord, LINE, RED } from '../fx/fx';
+import { t } from '../i18n';
 import { segmentHitsBox } from '../spider/actor';
 import { drawWordTag } from '../spider/rig';
 import type { RacerPane } from '../stage/racerPane';
@@ -277,7 +278,7 @@ export async function fanLaser(ctx: AttackContext): Promise<boolean> {
     live = false;
     ctx.actor.holds--;
   }
-  ctx.actor.status = `eye.laser.fan() · ${burned} words burned`;
+  ctx.actor.status = t().spider.burned(burned);
   await ctx.stage.wait(0.15);
   return true;
 }
@@ -364,7 +365,7 @@ export async function plantDecoys(ctx: AttackContext): Promise<boolean> {
     if (decoy) planted.push(decoy);
   }
   if (!planted.length) return false;
-  ctx.actor.status = 'plant(decoy) · trust me';
+  ctx.actor.status = t().spider.decoy;
   for (const decoy of planted) {
     const box = () => pane.boxToStage(pane.linkBox(decoy));
     const generation = pane.generation;

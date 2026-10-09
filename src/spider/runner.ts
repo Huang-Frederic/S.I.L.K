@@ -9,6 +9,7 @@
  * pane, eats the link the player was reaching for, dives into it, and the
  * panes swap owners.
  */
+import { t } from '../i18n';
 import { StageClosedError } from '../stage/stage';
 import type { RacerPane } from '../stage/racerPane';
 import { Interrupted, type ScoreTag, type SpiderActor } from './actor';
@@ -51,15 +52,10 @@ export interface RunnerOptions {
   onStuck: (why: string) => void;
 }
 
-const REASON_TAGS: Record<Decision['reason'], string | undefined> = {
-  target: 'direct hit',
-  backlink: 'backlink',
-  semantic: 'closest',
-  lexical: 'words',
-  'dead-end': undefined,
-};
-
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** The longest the spider stays on a page, from landing to grabbing its link (s). */
+export const HOP_SECONDS = 40;
 
 /** The anchor of a candidate link in a rendered article (decoys ignored). */
 export function findAnchor(pane: RacerPane, link: CandidateLink): HTMLAnchorElement | null {
@@ -131,7 +127,7 @@ export class SpiderRunner {
       }
     } catch (error) {
       if (error instanceof StageClosedError || error instanceof Interrupted || this.stopped) return;
-      actor.status = 'crashed into a network error';
+      actor.status = t().spider.crashed;
       this.o.onStuck(String(error));
     } finally {
       this.started = false;
@@ -143,6 +139,7 @@ export class SpiderRunner {
     const { actor, agent } = this.o;
     const pane = this.o.pane();
     const page = agent.page;
+    const landed = actor.stage.time;
     this.current = null;
     const move = await actor.scan(agent.think(), this.o.thinkMs() / 1000, page.links.length);
 
@@ -151,12 +148,12 @@ export class SpiderRunner {
       return true;
     }
     if (move.kind === 'stuck') {
-      actor.status = move.why === 'max-hops' ? 'exhausted: too many hops' : 'trapped: no way out of this page';
+      actor.status = move.why === 'max-hops' ? t().spider.exhausted : t().spider.trapped;
       this.o.onStuck(move.why);
       return true;
     }
     if (move.kind === 'retreat') {
-      actor.status = 'dead_end · climbing back up the thread';
+      actor.status = t().spider.deadEnd;
       actor.interruptible = false;
       try {
         await actor.climbOut();
@@ -178,7 +175,7 @@ export class SpiderRunner {
       const tags: ScoreTag[] = [];
       decision.shortlist.slice(0, 4).forEach(({ link: l, score }, i) => {
         const a = findAnchor(pane, l);
-        if (a) tags.push({ anchor: a, score, best: i === 0, tag: i === 0 ? REASON_TAGS[decision.reason] : undefined });
+        if (a) tags.push({ anchor: a, score, best: i === 0, tag: i === 0 ? t().spider.reasons[decision.reason] : undefined });
       });
       await actor.showScores(tags, this.o.scoreSeconds);
       // Now and then it goes the wrong way first (never with the target in sight).
@@ -190,7 +187,8 @@ export class SpiderRunner {
         if (other?.anchor) await actor.feint(other.anchor, other.title);
       }
       await actor.lock(anchor, link.title);
-      await actor.crawlTo(anchor);
+      // However long the page, it gets to its link within HOP_SECONDS of landing.
+      await actor.crawlTo(anchor, landed + HOP_SECONDS - this.o.grabSeconds - 1.5);
       await actor.grab(anchor, link.title, this.o.grabSeconds, next.catch(() => null));
     }
 
@@ -202,7 +200,7 @@ export class SpiderRunner {
       // Deleted since the page was rendered: forget it and think again.
       agent.discard(link);
       actor.resetPose();
-      actor.status = `"${link.title}" is gone · rethinking`;
+      actor.status = t().spider.gone(link.title);
       return false;
     }
 
@@ -213,7 +211,7 @@ export class SpiderRunner {
       this.current = null;
       this.o.onMove(nextPage.title, 'link', decision.reason);
       await actor.enterPage(pane, nextPage.loaded);
-      actor.flashStatus(`+1 HOP · hops: ${agent.hops}`);
+      actor.flashStatus(t().spider.hop(agent.hops));
     } finally {
       actor.interruptible = true;
     }
@@ -262,7 +260,7 @@ export class SpiderRunner {
       agent.follow(link, page);
       this.o.onMove(page.title, 'link', 'snatch');
       await actor.enterPage(target.pane, page.loaded);
-      actor.flashStatus(`+1 HOP · hops: ${agent.hops}`);
+      actor.flashStatus(t().spider.hop(agent.hops));
       return this.arrived(page);
     } finally {
       this.snatching = false;
@@ -289,7 +287,7 @@ export class SpiderRunner {
         return await run();
       } catch (error) {
         if (this.o.isMissing(error) || attempt >= attempts || this.stopped) throw error;
-        this.o.actor.status = 'network hiccup · retrying';
+        this.o.actor.status = t().spider.retrying;
         await sleep(2500 * attempt);
       }
     }

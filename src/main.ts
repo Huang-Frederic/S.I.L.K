@@ -9,9 +9,12 @@ import './styles/screens.css';
 
 import { DEFAULT_DIFFICULTY, DIFFICULTIES, type DifficultyId } from './game/difficulty';
 import type { ValidatedPair } from './game/pairs';
+import { setLang, type Lang } from './i18n';
 import { settings } from './settings';
+import { MODEL_IDS } from './spider/ai/embedProtocol';
 import { LexicalRanker } from './spider/ai/lexical';
 import { FallbackRanker, SemanticRanker } from './spider/ai/semantic';
+import type { Ranker } from './spider/ai/types';
 import { WorkerEmbedder } from './spider/ai/workerEmbedder';
 import { createFinishScreen } from './ui/finishScreen';
 import { RaceScreen, type RaceResult } from './ui/raceScreen';
@@ -20,16 +23,30 @@ import { ArticleStore } from './wiki/articles';
 import { WikiClient } from './wiki/client';
 
 const app = document.getElementById('app')!;
-const client = new WikiClient();
-const store = new ArticleStore(client);
 
-// The embedding model is shared by every race: it loads in the background
-// (in a Web Worker) as soon as the game opens, and its vectors stay cached.
-const embedder = new WorkerEmbedder();
-const ranker = new FallbackRanker(new SemanticRanker(embedder), new LexicalRanker());
-embedder.load().catch(() => {
-  // The spider falls back to word matching; its brain panel says so.
-});
+/** Everything tied to one Wikipedia: its client, its articles, and the spider's model for that language. */
+interface Services {
+  client: WikiClient;
+  store: ArticleStore;
+  embedder: WorkerEmbedder;
+  ranker: Ranker;
+}
+
+/**
+ * The embedding model is shared by every race: it loads in the background
+ * (in a Web Worker) as soon as the game opens, and its vectors stay cached.
+ */
+function servicesFor(lang: Lang): Services {
+  const client = new WikiClient({ lang });
+  const embedder = new WorkerEmbedder(MODEL_IDS[lang]);
+  embedder.load().catch(() => {
+    // The spider falls back to word matching; its brain panel says so.
+  });
+  return { client, store: new ArticleStore(client), embedder, ranker: new FallbackRanker(new SemanticRanker(embedder), new LexicalRanker()) };
+}
+
+setLang(settings.lang);
+let services = servicesFor(settings.lang);
 
 let currentRace: RaceScreen | null = null;
 let currentTitle: TitleScreen | null = null;
@@ -49,10 +66,21 @@ function clear(): void {
   currentTitle = null;
 }
 
+/** Another language: other texts, another Wikipedia, another model. */
+function switchLanguage(lang: Lang): void {
+  settings.lang = lang;
+  setLang(lang);
+  services.embedder.dispose();
+  services = servicesFor(lang);
+  // Titles from the other Wikipedia mean nothing here.
+  lastPair = null;
+  showTitle();
+}
+
 function showTitle(): void {
   clear();
   const title = createTitleScreen({
-    client,
+    client: services.client,
     initialStart: lastPair?.start.title,
     initialTarget: lastPair?.target.title,
     initialDifficulty: difficulty,
@@ -60,6 +88,7 @@ function showTitle(): void {
       difficulty = choice.difficulty;
       startRace(choice.pair);
     },
+    onLanguage: switchLanguage,
   });
   currentTitle = title;
   app.replaceChildren(title.element);
@@ -71,10 +100,10 @@ function startRace(pair: ValidatedPair): void {
   clear();
   lastPair = pair;
   const race = new RaceScreen({
-    client,
-    store,
-    ranker,
-    embedder,
+    client: services.client,
+    store: services.store,
+    ranker: services.ranker,
+    embedder: services.embedder,
     pair,
     difficulty: DIFFICULTIES[difficulty],
     onExit: showTitle,

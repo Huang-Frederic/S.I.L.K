@@ -27,6 +27,16 @@ describe('settings', () => {
     expect(settings.duration(1)).toBe(1);
   });
 
+  it('plays in French until told otherwise, and remembers the language', async () => {
+    const { settings } = await import('../src/settings');
+    expect(settings.lang).toBe('fr');
+    settings.lang = 'en';
+    expect(localStorage.getItem('silk.lang')).toBe('en');
+    expect(settings.lang).toBe('en');
+    localStorage.setItem('silk.lang', 'klingon');
+    expect(settings.lang).toBe('fr');
+  });
+
   it('works without storage (private mode, blocked site data)', async () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('SecurityError');

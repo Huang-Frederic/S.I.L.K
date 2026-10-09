@@ -15,7 +15,8 @@
  *    goes, and fumbles a little for the right link; rage is always on.
  *    Expected win rate: almost zero.
  *
- * Attacks never come with a telegraph: they land instantly.
+ * Attacks never come with a telegraph: they land instantly. Names and
+ * blurbs are in the language files (i18n).
  */
 export type DifficultyId = 'easy' | 'normal' | 'hard';
 
@@ -38,8 +39,6 @@ export interface SnatchRule {
 
 export interface Difficulty {
   id: DifficultyId;
-  label: string;
-  blurb: string;
   /** Minimum time spent scanning each page (ms). */
   thinkMs: number;
   /** Crawling speed over the text (CSS px per second). */
@@ -87,8 +86,6 @@ export interface Difficulty {
 export const DIFFICULTIES: Record<DifficultyId, Difficulty> = {
   easy: {
     id: 'easy',
-    label: 'Easy',
-    blurb: 'It only crawls and eats its own page. Slow thinker. Never touches you. Winnable.',
     thinkMs: 6500,
     walkSpeed: 70,
     sprint: 1.8,
@@ -115,8 +112,6 @@ export const DIFFICULTIES: Record<DifficultyId, Difficulty> = {
   },
   normal: {
     id: 'normal',
-    label: 'Normal',
-    blurb: 'It runs. Web traps, fan lasers and word bombs, about every 25 s. Hard but winnable.',
     thinkMs: 3200,
     walkSpeed: 200,
     sprint: 1.8,
@@ -143,8 +138,6 @@ export const DIFFICULTIES: Record<DifficultyId, Difficulty> = {
   },
   hard: {
     id: 'hard',
-    label: 'Hard',
-    blurb: 'Everything, every few seconds, no warning. It tears the page apart. Get ahead and it steals your good links. Expected win rate: almost zero.',
     thinkMs: 3000,
     walkSpeed: 230,
     sprint: 2,

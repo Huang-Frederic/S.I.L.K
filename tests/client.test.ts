@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validatePair } from '../src/game/pairs';
+import { pickRandomTarget, TARGET_POOLS, validatePair } from '../src/game/pairs';
 import { ArticleNotFoundError, canonicalTitleFromHtml, WikiClient } from '../src/wiki/client';
 import { HttpQueue } from '../src/wiki/http';
 import { demoPages } from './helpers/demoWorld';
@@ -94,5 +94,47 @@ describe('validatePair', () => {
     if (!same.ok) expect(same.errors.target).toMatch(/different/);
     const empty = await validatePair(client, '', '');
     expect(empty.ok).toBe(false);
+  });
+  it('answers in French for French Wikipedia', async () => {
+    const wiki = new FakeWiki(demoPages());
+    const client = new WikiClient({ lang: 'fr', http: new HttpQueue({ fetchFn: wiki.fetch, sleep: async () => {} }) });
+    const missing = await validatePair(client, 'Nulle part', 'Lighthouse');
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) {
+      expect(missing.errors.start).toBe('Aucun article de Wikipédia en français ne s’appelle « Nulle part ».');
+      expect(missing.errors.target).toMatch(/page d’homonymie/);
+    }
+    const empty = await validatePair(client, '', 'Loomhaven');
+    if (!empty.ok) expect(empty.errors.start).toBe('Choisis un article de départ.');
+  });
+});
+
+describe('WikiClient languages', () => {
+  it('talks to the Wikipedia of its language', async () => {
+    const wiki = new FakeWiki(demoPages());
+    const fr = new WikiClient({ lang: 'fr', http: new HttpQueue({ fetchFn: wiki.fetch, sleep: async () => {} }) });
+    await fr.fetchArticle('Loomhaven');
+    await fr.fetchBacklinks('Loomhaven');
+    expect(wiki.requests.length).toBeGreaterThan(1);
+    expect(wiki.requests.every((url) => url.startsWith('https://fr.wikipedia.org/'))).toBe(true);
+    expect(new WikiClient().lang).toBe('en');
+  });
+
+  it('says in French that an article does not exist', async () => {
+    const wiki = new FakeWiki(demoPages());
+    const fr = new WikiClient({ lang: 'fr', http: new HttpQueue({ fetchFn: wiki.fetch, sleep: async () => {} }) });
+    await expect(fr.fetchArticle('Sunken Library')).rejects.toThrow('L’article « Sunken Library » n’existe pas sur Wikipédia en français.');
+  });
+});
+
+describe('random targets', () => {
+  it('come from the pool of the race’s Wikipedia', () => {
+    for (let i = 0; i < 20; i++) {
+      expect(TARGET_POOLS.fr).toContain(pickRandomTarget('fr', [], () => i / 20));
+      expect(TARGET_POOLS.en).toContain(pickRandomTarget('en', [], () => i / 20));
+    }
+    expect(pickRandomTarget('fr', ['Lune'], () => 0)).not.toBe('Lune');
+    expect(new Set(TARGET_POOLS.fr).size).toBe(TARGET_POOLS.fr.length);
+    expect(TARGET_POOLS.fr.length).toBeGreaterThan(150);
   });
 });
