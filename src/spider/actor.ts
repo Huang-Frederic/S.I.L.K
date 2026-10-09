@@ -97,6 +97,7 @@ export class SpiderActor implements Drawable {
   private lockOn: { anchor: HTMLAnchorElement; text: string } | null = null;
   private flash: { text: string; until: number } | null = null;
   private edges: EdgeGlitch | null = null;
+  private grabbed: HTMLAnchorElement | null = null;
   private camY = 0;
   private readonly ground: Ground = { hold: (p) => this.footHold(p) };
   private readonly removeFromStage: () => void;
@@ -186,6 +187,8 @@ export class SpiderActor implements Drawable {
     this.rays = [];
     this.lockOn = null;
     this.stopEdges();
+    this.grabbed?.classList.remove('is-grabbed');
+    this.grabbed = null;
     if (this.surface && rig.visible) rig.plantAll(this.ground);
   }
 
@@ -733,6 +736,7 @@ export class SpiderActor implements Drawable {
     rig.pose = 'grab';
     rig.grabBox = box;
     anchor.classList.add('is-grabbed');
+    this.grabbed = anchor;
     this.status = `LOCKED · ${snakeCase(title)}`;
     this.startEdges(pane);
     const from = { x: rig.x, y: rig.y };
@@ -784,6 +788,7 @@ export class SpiderActor implements Drawable {
     rig.pose = 'stand';
     rig.grabBox = null;
     anchor?.classList.remove('is-grabbed');
+    this.grabbed = null;
     this.stopEdges();
     this.trail = [];
   }

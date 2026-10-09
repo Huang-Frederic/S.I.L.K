@@ -40,6 +40,8 @@ export interface RunnerOptions {
   onMove: (title: string, via: 'link' | 'back', note?: string) => void;
   /** A snatch worked: swap the panes' owners (before the new page glitches in). */
   onSwap: (target: SnatchTarget, formerTitle: string) => void;
+  /** The spider leaps for the player's link (the player's pending click is void). */
+  onSnatchStart?: (target: SnatchTarget) => void;
   /** The spider just ate the player's link. */
   onSnatch?: (target: SnatchTarget) => void;
   /** The spider stands on the target page. */
@@ -216,6 +218,8 @@ export class SpiderRunner {
   /** Leap across, eat the player's link, wiggle, dive in, swap panes. */
   private async snatch(target: SnatchTarget): Promise<boolean> {
     const { actor, agent } = this.o;
+    // The player got there first (the page changed under the cursor).
+    if (!target.anchor.isConnected || target.pane.owner !== 'player') return false;
     const home = this.o.pane();
     const formerTitle = agent.page.title;
     const link: CandidateLink = { title: target.title, linkedTitle: target.title, text: target.anchor.textContent ?? target.title, order: -1 };
@@ -223,6 +227,7 @@ export class SpiderRunner {
     this.snatching = true;
     this.current = null;
     actor.interruptible = false;
+    this.o.onSnatchStart?.(target);
     try {
       const spot = () => {
         const b = target.pane.linkBox(target.anchor);

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Generates the favicon set from one vector description of the S.I.L.K
- * spider: public/favicon.svg, plus PNG fallbacks (32 px favicon and 180 px
+ * spider (the line-drawn rig of the mockups): public/favicon.svg, plus PNG fallbacks (32 px favicon and 180 px
  * Apple touch icon) rasterized here with a tiny supersampling renderer, so
  * no image tool or third-party asset is needed.
  *
@@ -10,30 +10,30 @@
 import { writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
-const BG = '#05070b';
-const LEG = '#e8f6ff';
-const CYAN = '#5ee6ff';
-const PINK = '#ff3d7f';
+const BG = '#0b0e12';
+const PAGE = '#101418';
+const LINE = '#f0f4f8';
+const RED = '#ff2b3a';
 
-/** The spider hangs head-down from its thread, in a 32x32 box. */
-const left = [
-  // From the cephalothorax, through the knee, to the foot.
-  [[14.4, 20.6], [10.2, 23.6], [8.4, 29]],
-  [[14, 19.6], [8.6, 20.2], [4.4, 24.4]],
-  [[14, 18.4], [8.4, 15.8], [4.2, 17.2]],
-  [[14.4, 17.4], [10.4, 12.6], [7, 8.8]],
+/**
+ * The rig from the mockups, seen from above in a 32x32 box: a plain outlined
+ * body, one red eye, eight legs (hip, knee, foot) and foot dots.
+ */
+const right = [
+  [[18.6, 12], [22.5, 8.6], [25.6, 4.6]],
+  [[18.6, 14.6], [23.4, 12.6], [28.2, 11.8]],
+  [[18.6, 17.4], [23.4, 19.4], [28.2, 21.4]],
+  [[18.6, 20], [22.4, 23.6], [25.4, 27.8]],
 ];
-const legs = [...left, ...left.map((leg) => leg.map(([x, y]) => [32 - x, y]))];
+const legs = [...right, ...right.map((leg) => leg.map(([x, y]) => [32 - x, y]))];
 
 const shapes = [
   { type: 'rect', x: 0, y: 0, w: 32, h: 32, r: 7, fill: BG },
-  { type: 'line', points: [[16, 0], [16, 8]], width: 1, stroke: LEG, opacity: 0.55 },
-  ...legs.map((points) => ({ type: 'line', points, width: 1.7, stroke: LEG })),
-  { type: 'ellipse', cx: 16, cy: 12.6, rx: 4.2, ry: 5, fill: BG, stroke: CYAN, width: 1.4 },
-  { type: 'ellipse', cx: 16, cy: 19.6, rx: 2.9, ry: 2.6, fill: BG, stroke: CYAN, width: 1.4 },
-  { type: 'circle', cx: 16, cy: 12.6, r: 1.7, fill: PINK },
-  { type: 'circle', cx: 15, cy: 20.6, r: 0.75, fill: CYAN },
-  { type: 'circle', cx: 17, cy: 20.6, r: 0.75, fill: CYAN },
+  ...legs.map((points) => ({ type: 'line', points, width: 1.3, stroke: LINE })),
+  ...legs.map((points) => ({ type: 'circle', cx: points[2][0], cy: points[2][1], r: 1.15, fill: LINE })),
+  { type: 'box', x: 13.4, y: 10.4, w: 5.2, h: 11.2, fill: PAGE, stroke: LINE, width: 1.2 },
+  { type: 'circle', cx: 16, cy: 13.4, r: 2.7, fill: RED, opacity: 0.3 },
+  { type: 'circle', cx: 16, cy: 13.4, r: 1.6, fill: RED },
 ];
 
 // ------------------------------------------------------------------ SVG
@@ -49,7 +49,9 @@ function toSvg() {
         case 'ellipse':
           return `<ellipse cx="${s.cx}" cy="${s.cy}" rx="${s.rx}" ry="${s.ry}" fill="${s.fill}" stroke="${s.stroke}" stroke-width="${s.width}"/>`;
         case 'circle':
-          return `<circle cx="${s.cx}" cy="${s.cy}" r="${s.r}" fill="${s.fill}"/>`;
+          return `<circle cx="${s.cx}" cy="${s.cy}" r="${s.r}" fill="${s.fill}"${s.opacity ? ` fill-opacity="${s.opacity}"` : ''}/>`;
+        case 'box':
+          return `<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" fill="${s.fill}" stroke="${s.stroke}" stroke-width="${s.width}"/>`;
       }
     })
     .join('\n  ');
@@ -90,7 +92,15 @@ function paint(s, x, y) {
       return d < 1 ? [rgb(s.fill), 1] : null;
     }
     case 'circle':
-      return Math.hypot(x - s.cx, y - s.cy) <= s.r ? [rgb(s.fill), 1] : null;
+      return Math.hypot(x - s.cx, y - s.cy) <= s.r ? [rgb(s.fill), s.opacity ?? 1] : null;
+    case 'box': {
+      // Stroke straddles the outline.
+      const half = s.width / 2;
+      const inside = x >= s.x - half && x <= s.x + s.w + half && y >= s.y - half && y <= s.y + s.h + half;
+      if (!inside) return null;
+      const edge = Math.min(Math.abs(x - s.x), Math.abs(x - s.x - s.w), Math.abs(y - s.y), Math.abs(y - s.y - s.h));
+      return edge <= half ? [rgb(s.stroke), 1] : [rgb(s.fill), 1];
+    }
   }
   return null;
 }

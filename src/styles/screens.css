@@ -437,6 +437,8 @@
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
+  /* Not even scrollable by script (focus, scrollIntoView). */
+  overflow: clip;
   background: var(--bg);
   translate: var(--shake-x, 0px) var(--shake-y, 0px);
 }
@@ -476,6 +478,7 @@
 }
 
 .hud-target-title {
+  min-width: 0;
   overflow: hidden;
   color: var(--line);
   font: 600 22px/1.2 var(--font-serif);
@@ -1188,7 +1191,7 @@
 
 @media (max-width: 900px) {
   .race-hud {
-    grid-template-columns: auto 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
     height: auto;
     min-height: 64px;
     padding-top: 8px;
@@ -1200,6 +1203,7 @@
   }
 
   .hud-target {
+    min-width: 0;
     max-width: none;
     padding: 8px 12px;
   }

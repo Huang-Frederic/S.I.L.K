@@ -109,6 +109,7 @@ export class RaceScreen {
   private brain: { head: string; rows: BrainRow[] } = { head: '', rows: [] };
   private clockText = '';
   private readonly removeFrameHook: () => void;
+  private resizeObserver: ResizeObserver | null = null;
   private readonly onVisibility = () => this.handleVisibility();
   private readonly onClickCapture = (event: MouseEvent) => this.retargetClick(event);
 
@@ -173,6 +174,12 @@ export class RaceScreen {
     this.taunts = new TauntPicker(difficulty.taunts);
     this.stage.add({ z: Z.links, draw: (ctx) => this.drawHover(ctx) });
     this.removeFrameHook = this.stage.onFrame(() => this.beforeFrame());
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) this.panes.find((p) => p.scroller === entry.target)?.words.relayout();
+      });
+      for (const pane of this.panes) this.resizeObserver.observe(pane.scroller);
+    }
 
     this.updateHeaders();
     this.spiderPane.setWordsEaten(0);
@@ -276,6 +283,7 @@ export class RaceScreen {
       onDecision: (decision, page) => this.showBrain(decision, page),
       onMove: (title, via, note) => this.onSpiderMove(title, via, note),
       onSwap: (target, formerTitle) => this.swapPanes(target, formerTitle),
+      onSnatchStart: () => this.cancelNavigation(),
       onSnatch: (target) => this.say(this.isTarget(target.title) ? 'snatch-target' : 'snatch'),
       onArrive: () => void this.spiderWins(),
       onStuck: () => this.onSpiderStuck(),
@@ -322,6 +330,7 @@ export class RaceScreen {
     void this.runner?.stop();
     this.cursor.release();
     this.removeFrameHook();
+    this.resizeObserver?.disconnect();
     this.actor.destroy();
     this.stage.destroy();
     document.removeEventListener('visibilitychange', this.onVisibility);
@@ -411,6 +420,8 @@ export class RaceScreen {
 
   private onLinkClick(pane: RacerPane, title: string, anchor: HTMLAnchorElement): void {
     if (pane.owner !== 'player' || this.phase !== 'racing' || !title) return;
+    // Mid-snatch, the spider owns the moment.
+    if (this.runner?.snatching) return;
     if (anchor.dataset.decoy) {
       this.clickDecoy(pane, anchor);
       return;
@@ -422,13 +433,21 @@ export class RaceScreen {
     void this.navigate(title, 'link');
   }
 
+  /** Forgets the player's pending click (the spider is stealing it). */
+  private cancelNavigation(): void {
+    this.navToken++;
+    this.navBusy = false;
+    this.playerPane.view.clearOverlay();
+    this.updateHeaders();
+  }
+
   private goBack(): void {
     if (this.history.length < 2) return;
     void this.navigate(this.history[this.history.length - 2], 'back');
   }
 
   private async navigate(title: string, via: 'link' | 'back'): Promise<void> {
-    if (this.phase !== 'racing' || this.navBusy || this.race.isDone('player')) return;
+    if (this.phase !== 'racing' || this.navBusy || this.race.isDone('player') || this.runner?.snatching) return;
     const pane = this.playerPane;
     const token = ++this.navToken;
     this.navBusy = true;
