@@ -89,11 +89,16 @@ function groundOf(lines: Line[], rig: SpiderRig): Ground {
   };
 }
 
-function spider(x: number, y: number, lines: Line[], size = 0.72): SpiderRig {
+/** A spider standing on the text, facing `facing` (upright by default). */
+function spider(x: number, y: number, lines: Line[], size = 0.72, facing?: Point): SpiderRig {
   const rig = new SpiderRig(size);
   rig.x = x;
   rig.y = y;
   rig.visible = true;
+  if (facing) {
+    rig.face(facing);
+    rig.tilt = rig.targetTilt;
+  }
   rig.plantAll(groundOf(lines, rig));
   return rig;
 }
@@ -129,8 +134,8 @@ const PAINTERS: Record<IllustrationKind, (ctx: CanvasRenderingContext2D) => void
     const row = lines[3];
     const eaten = row.words.slice(1, 4);
     for (const w of eaten) strokeBox(ctx, { ...w, top: w.top - 4, bottom: w.bottom + 4 }, RED, { dash: [3, 3], pad: 2 });
-    const rig = spider(center(row.words[4]).x, row.y, lines);
-    drawSilk(ctx, [{ x: 20, y: row.y + 12 }, { x: rig.x, y: row.y + 12 }], 0.5);
+    const rig = spider(center(row.words[4]).x, row.y, lines, 0.72, { x: 1, y: 0 });
+    drawSilk(ctx, [{ x: 20, y: row.y }, rig.spinneret()], 0.5);
     rig.draw(ctx);
     // Feet boxes: the words nearest to each foot.
     const feetWords = lines.flatMap((l) => l.words).filter((w) => Math.hypot(center(w).x - rig.x, center(w).y - rig.y) < 95 && Math.hypot(center(w).x - rig.x, center(w).y - rig.y) > 60).slice(0, 4);
@@ -180,10 +185,12 @@ const PAINTERS: Record<IllustrationKind, (ctx: CanvasRenderingContext2D) => void
     rig.x = 340;
     rig.y = 84;
     rig.visible = true;
+    // Head down on its thread, the eye towards where it drops.
+    rig.tilt = rig.targetTilt = Math.PI;
     rig.pose = 'hang';
     rig.liftAll();
     rig.update(0.5);
-    drawSilk(ctx, [{ x: 340, y: 0 }, rig.top()], 0.9);
+    drawSilk(ctx, [{ x: 340, y: 0 }, rig.spinneret()], 0.9);
     rig.draw(ctx);
     caption(ctx, '+1 HOP · hops: 7', RED, true);
   },
@@ -191,8 +198,8 @@ const PAINTERS: Record<IllustrationKind, (ctx: CanvasRenderingContext2D) => void
     const lines = layout(21);
     const victim = lines[1].words[1];
     drawText(ctx, lines, { skip: [victim] });
-    const rig = spider(300, 190, lines);
     const cut = center(victim);
+    const rig = spider(300, 190, lines, 0.72, { x: cut.x - 300, y: cut.y - 190 });
     drawLaser(ctx, rig.eye(), cut, 1);
     ctx.save();
     ctx.font = `600 22px "Source Serif 4", Charter, Georgia, serif`;
@@ -237,7 +244,7 @@ const PAINTERS: Record<IllustrationKind, (ctx: CanvasRenderingContext2D) => void
     const word = lines[4].words[3];
     drawText(ctx, lines, { skip: [word] });
     const c = center(word);
-    const rig = spider(c.x - 60, c.y - 70, lines);
+    const rig = spider(c.x - 60, c.y - 70, lines, 0.72, { x: 60, y: 70 });
     rig.draw(ctx);
     ctx.strokeStyle = LINE;
     for (const [r, a] of [
@@ -265,11 +272,12 @@ const PAINTERS: Record<IllustrationKind, (ctx: CanvasRenderingContext2D) => void
   zip(ctx) {
     const lines = layout(41, 84, 6);
     drawText(ctx, lines, { title: false });
-    const rig = spider(100, 236, lines, 0.6);
     const tag = { x: 330, y: 44 };
+    const rig = spider(100, 236, lines, 0.6, { x: tag.x - 100, y: tag.y - 236 });
+    const eye = rig.eye();
     ctx.strokeStyle = 'rgba(240, 244, 248, 0.85)';
     ctx.beginPath();
-    ctx.moveTo(rig.x, rig.y - 14);
+    ctx.moveTo(eye.x, eye.y);
     ctx.lineTo(tag.x - 40, tag.y + 14);
     ctx.stroke();
     ctx.save();
