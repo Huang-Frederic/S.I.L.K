@@ -12,6 +12,7 @@ import type { ValidatedPair } from './game/pairs';
 import { LexicalRanker } from './spider/ai/lexical';
 import { FallbackRanker, SemanticRanker } from './spider/ai/semantic';
 import { WorkerEmbedder } from './spider/ai/workerEmbedder';
+import { Logo } from './ui/logo';
 import { RaceScreen } from './ui/raceScreen';
 import { createSetupScreen } from './ui/setupScreen';
 import { ArticleStore } from './wiki/articles';
@@ -62,6 +63,7 @@ function showSetup(): void {
       initialStart: lastPair?.start.title,
       initialTarget: lastPair?.target.title,
       initialDifficulty: difficulty,
+      logo: new Logo().element,
       onStart: (choice) => {
         difficulty = choice.difficulty;
         saveDifficulty(difficulty);

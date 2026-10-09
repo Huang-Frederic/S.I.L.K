@@ -163,10 +163,13 @@ export class Crawler {
     this.lastY = this.y;
 
     if (!this.grounded) {
-      for (const leg of this.legs) {
-        leg.foot = this.restFoot(leg, { x: 0, y: 0 });
+      // Hanging on silk: feet follow the body, with a slow, uneven wiggle.
+      this.legs.forEach((leg, i) => {
+        const rest = this.restFoot(leg, { x: 0, y: 0 });
+        const w = 2.4 * this.size * Math.sin(this.time * 2.4 + i * 1.7);
+        leg.foot = { x: rest.x + w, y: rest.y - w * 0.5 };
         leg.t = 1;
-      }
+      });
       return;
     }
 

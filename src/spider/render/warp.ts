@@ -127,11 +127,13 @@ export class Warp {
       if (e < 0.02) {
         // At rest: the fragment is a horizontal bar where the text was.
         ctx.globalAlpha = this.mode === 'out' ? Math.min(1, t * 4) : 1;
+        ctx.lineCap = 'butt';
         ctx.lineWidth = streak.h;
         ctx.beginPath();
         ctx.moveTo(streak.x - streak.w / 2, streak.y);
         ctx.lineTo(streak.x + streak.w / 2, streak.y);
         ctx.stroke();
+        ctx.lineCap = 'round';
         continue;
       }
       // In motion: a trail from a slightly earlier position to the head.

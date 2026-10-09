@@ -105,6 +105,20 @@ describe('HttpQueue', () => {
     expect(sleeps).toEqual([5000, 10000]);
   });
 
+  it('lets a request use its own retry budget', async () => {
+    let attempts = 0;
+    const queue = new HttpQueue({
+      maxRetries: 3,
+      sleep: async () => {},
+      fetchFn: async () => {
+        attempts++;
+        return new Response('busy', { status: 503 });
+      },
+    });
+    await expect(queue.getText('https://x/suggest', { maxRetries: 0 })).rejects.toBeInstanceOf(HttpError);
+    expect(attempts).toBe(1);
+  });
+
   it('does not retry client errors and does not cache failures', async () => {
     let attempts = 0;
     const queue = new HttpQueue({

@@ -46,6 +46,8 @@ export interface RaceScreenOptions {
  */
 type Phase = 'loading' | 'countdown' | 'racing' | 'finishing' | 'intermission' | 'over';
 
+const BASE_TITLE = 'S.I.L.K: Spider Indexing Links & Knowledge';
+
 /** How long to wait for the embedding model before starting anyway. */
 const MODEL_GRACE_MS = 8000;
 
@@ -61,6 +63,8 @@ export class RaceScreen {
   private readonly noteEl: HTMLElement;
   private readonly overlay: HTMLElement;
   private readonly giveUpBtn: HTMLButtonElement;
+  private readonly panes: HTMLElement;
+  private readonly tabs: Record<Racer, HTMLButtonElement>;
   private phase: Phase = 'loading';
   /** Whether the spider's animation should be running (ignoring tab visibility). */
   private spiderActive = false;
@@ -88,6 +92,17 @@ export class RaceScreen {
     this.giveUpBtn.disabled = true;
     this.overlay = h('div', { class: 'race-overlay' });
 
+    // Small screens show one pane at a time; these tabs switch between them.
+    this.panes = h('div', { class: 'race-panes is-split', dataset: { show: 'player' } }, this.player.element, this.spider.element);
+    const tab = (who: Racer, label: string) =>
+      h('button', {
+        class: `pane-tab is-${who}`,
+        text: label,
+        attrs: { type: 'button', role: 'tab', 'aria-selected': String(who === 'player') },
+        on: { click: () => this.showPane(who) },
+      });
+    this.tabs = { player: tab('player', 'You'), spider: tab('spider', 'Spider') };
+
     this.element = h(
       'main',
       { class: 'screen screen-race' },
@@ -109,10 +124,12 @@ export class RaceScreen {
           this.giveUpBtn,
         ),
       ),
-      h('div', { class: 'race-panes is-split' }, this.player.element, this.spider.element),
+      this.panes,
+      h('nav', { class: 'pane-switch', attrs: { role: 'tablist', 'aria-label': 'Which article to show' } }, this.tabs.player, this.tabs.spider),
       this.overlay,
     );
     document.addEventListener('visibilitychange', this.onVisibility);
+    this.setTitle(`${pair.start.title} → ${pair.target.title}`);
   }
 
   // ------------------------------------------------------------ lifecycle
@@ -189,6 +206,7 @@ export class RaceScreen {
 
   destroy(): void {
     this.destroyed = true;
+    document.title = BASE_TITLE;
     cancelAnimationFrame(this.frame);
     this.runner?.stop();
     this.spider.destroy();
@@ -218,7 +236,10 @@ export class RaceScreen {
     if (this.phase !== 'racing') return;
     const arrived = this.race.move(who, title, via, who === 'spider' ? reason : undefined);
     if (who === 'player') this.player.setHops(this.race.player.hops);
-    else this.spider.setHops(this.race.spider.hops);
+    else {
+      this.spider.setHops(this.race.spider.hops);
+      this.tabs.spider.textContent = `Spider · ${this.race.spider.hops}`;
+    }
     if (!arrived) return;
 
     if (who === 'player') {
@@ -267,6 +288,8 @@ export class RaceScreen {
 
   private showEnd(): void {
     this.phase = this.race.over ? 'over' : 'intermission';
+    const winner = this.race.winner;
+    this.setTitle(winner === 'player' ? 'You win!' : winner === 'spider' ? 'The spider wins' : 'Race over');
     this.giveUpBtn.disabled = true;
     this.clockEl.textContent = formatTime(this.race.clock.elapsed());
     const canKeepPlaying = this.race.winner === 'spider' && !this.race.isDone('player');
@@ -324,9 +347,18 @@ export class RaceScreen {
 
   // ------------------------------------------------------------------- UI
 
+  private showPane(who: Racer): void {
+    this.panes.dataset.show = who;
+    for (const [racer, button] of Object.entries(this.tabs)) button.setAttribute('aria-selected', String(racer === who));
+  }
+
   private hideOverlay(): void {
     this.overlay.hidden = true;
     this.overlay.replaceChildren();
+  }
+
+  private setTitle(text: string): void {
+    document.title = `${text} · S.I.L.K`;
   }
 
   private note(text: string): void {

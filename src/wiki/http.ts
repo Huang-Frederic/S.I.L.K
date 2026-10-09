@@ -41,6 +41,8 @@ export interface RequestOptions {
   noCache?: boolean;
   /** Jump ahead of queued requests (used for the player's page loads). */
   priority?: boolean;
+  /** Overrides the queue's retry budget (e.g. 0 for autocomplete). */
+  maxRetries?: number;
 }
 
 export interface HttpQueueOptions {
@@ -97,7 +99,7 @@ export class HttpQueue {
       const cached = this.cache.get(url);
       if (cached) return cached;
     }
-    const promise = this.schedule(() => this.fetchWithRetry(url), options.priority ?? false);
+    const promise = this.schedule(() => this.fetchWithRetry(url, options.maxRetries ?? this.maxRetries), options.priority ?? false);
     if (!options.noCache) {
       this.cache.set(url, promise);
       // Failed requests must not poison the cache.
@@ -134,7 +136,7 @@ export class HttpQueue {
     });
   }
 
-  private async fetchWithRetry(url: string): Promise<FetchedText> {
+  private async fetchWithRetry(url: string, maxRetries: number): Promise<FetchedText> {
     for (let attempt = 0; ; attempt++) {
       const wait = this.backoffUntil - this.now();
       if (wait > 0) await this.sleep(wait);
@@ -145,13 +147,13 @@ export class HttpQueue {
       } catch (error) {
         // A throttled cross-origin response without CORS headers surfaces as
         // a network error, so treat it like a rate limit: wait, then retry.
-        if (attempt >= this.maxRetries) throw new NetworkError(url, error);
+        if (attempt >= maxRetries) throw new NetworkError(url, error);
         await this.sleep(this.backoffDelay(attempt));
         continue;
       }
 
       if (response.status === 429 || response.status >= 500) {
-        if (attempt >= this.maxRetries) throw new HttpError(response.status, url);
+        if (attempt >= maxRetries) throw new HttpError(response.status, url);
         const delay = Math.min(
           parseRetryAfter(response.headers.get('retry-after'), this.now()) ?? this.backoffDelay(attempt),
           30_000,

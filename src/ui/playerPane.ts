@@ -85,6 +85,7 @@ export class PlayerPane {
     this.busy = true;
     this.updateBack();
     this.view.showLoading(`Loading “${title}”…`);
+    const slow = setTimeout(() => this.view.showLoading(`Still loading “${title}”… Wikipedia may be busy, retrying.`), 4000);
     try {
       const loaded = await this.options.store.load(title, { priority: true });
       if (!this.enabled) {
@@ -106,6 +107,7 @@ export class PlayerPane {
         { label: 'Dismiss', run: () => this.view.clearOverlay() },
       ]);
     } finally {
+      clearTimeout(slow);
       this.busy = false;
       this.updateBack();
     }

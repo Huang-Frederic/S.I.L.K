@@ -74,6 +74,7 @@ export class SpiderPane {
   private rafId = 0;
   private lastTime = 0;
   private paused = false;
+  private drawnWhilePaused = false;
   private closed = false;
   private waiters: Array<{ resolve: (dt: number) => void; reject: (error: Error) => void }> = [];
 
@@ -226,7 +227,7 @@ export class SpiderPane {
     if (!anchor || !article) return;
     this.lock = { el: anchor, label, since: this.time };
 
-    const block = textBlockOf(anchor, article);
+    const block = textBlockOf(anchor, anchor.parentElement ?? article);
     const words = wrapWords(block).filter((w) => !anchor.contains(w) && !isEaten(w));
     const boxes = words.map((w) => this.fx.toContent(w.getClientRects()[0] ?? w.getBoundingClientRect()));
     const linkBox = this.anchorBox(anchor);
@@ -373,7 +374,7 @@ export class SpiderPane {
 
   private eat(word: HTMLElement, box: Box): void {
     eatWord(word);
-    this.bites.add(box, this.frame);
+    this.bites.add(box, this.frame, word);
     const inLink = !!word.closest('a');
     const c = boxCenter(box);
     this.shards.burst(c.x, c.y, {
@@ -460,7 +461,9 @@ export class SpiderPane {
 
   private refreshLayout(): void {
     this.spider.size = Math.max(0.6, Math.min(1, this.fx.width / 760));
-    if (this.view.articleElement) this.collectLinks();
+    if (!this.view.articleElement) return;
+    this.collectLinks();
+    this.bites.relayout((word) => this.fx.toContent(word.getClientRects()[0] ?? word.getBoundingClientRect()));
   }
 
   private duration(seconds: number): number {
@@ -519,8 +522,14 @@ export class SpiderPane {
     const dt = this.lastTime ? Math.min(0.05, (now - this.lastTime) / 1000) : 0;
     this.lastTime = now;
     // Draw what the coroutines prepared last frame, then let them step again.
+    // A paused pane is drawn once and then left alone.
+    if (this.paused) {
+      if (!this.drawnWhilePaused) this.render();
+      this.drawnWhilePaused = true;
+      return;
+    }
+    this.drawnWhilePaused = false;
     this.render();
-    if (this.paused) return;
     this.frame++;
     this.time += dt;
     if (this.thinking) this.thinkTime += dt;

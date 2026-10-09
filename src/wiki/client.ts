@@ -176,7 +176,7 @@ export class WikiClient {
    * (blredirect=1). Large targets have huge backlink sets, so we stop after a
    * few batches: the set is a heuristic, not an oracle.
    */
-  async fetchBacklinks(title: string, maxBatches = 6): Promise<Backlinks> {
+  async fetchBacklinks(title: string, maxBatches = 4): Promise<Backlinks> {
     const linking = new Set<string>();
     const aliases = new Set<string>();
     let cont: Record<string, string> = {};
@@ -256,6 +256,7 @@ export class WikiClient {
         namespace: '0',
         redirects: 'resolve',
       }),
+      { maxRetries: 0 }, // a stale suggestion is not worth waiting for
     );
     return Array.isArray(data?.[1]) ? data[1] : [];
   }
@@ -271,7 +272,7 @@ export class WikiClient {
         prop: 'info|pageprops',
         ppprop: 'disambiguation',
       }),
-      { noCache: true },
+      { noCache: true, maxRetries: 1 },
     );
     return (data.query?.pages ?? []).map((p) => ({
       title: p.title,

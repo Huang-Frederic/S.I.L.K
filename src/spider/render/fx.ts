@@ -114,14 +114,21 @@ interface Bite {
   box: Box;
   seed: number;
   age: number;
+  /** The eaten word, to follow it when the layout changes. */
+  word?: Element;
 }
 
 /** Bitten-out words: the word's box with tooth notches, outlined in neon. */
 export class BiteMarks {
   private bites: Bite[] = [];
 
-  add(box: Box, seed: number): void {
-    this.bites.push({ box, seed, age: 0 });
+  add(box: Box, seed: number, word?: Element): void {
+    this.bites.push({ box, seed, age: 0, word });
+  }
+
+  /** Recomputes boxes after a layout change (e.g. window resize). */
+  relayout(measure: (word: Element) => Box): void {
+    for (const bite of this.bites) if (bite.word?.isConnected) bite.box = measure(bite.word);
   }
 
   update(dt: number): void {
