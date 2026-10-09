@@ -90,43 +90,59 @@ export function strokeBox(ctx: CanvasRenderingContext2D, box: Box, color: string
   ctx.restore();
 }
 
-/** A spider web: spokes and a spiral, centred on `c`. */
-export function drawWeb(ctx: CanvasRenderingContext2D, c: Point, radius: number, alpha: number, seed = 1): void {
-  if (alpha <= 0) return;
-  const spokes = 11;
-  const rings = 6;
-  const angle = (i: number) => (i / spokes) * Math.PI * 2 + Math.sin(seed + i) * 0.12;
-  const radiusAt = (i: number) => radius * (0.86 + 0.14 * Math.sin(seed * 3 + i * 1.7));
+/**
+ * A web in the game's line-art style: straight spokes and polygonal rings
+ * (no sagging, hand-drawn threads), with a small square at every knot like
+ * the rig's knees. `build` (0 -> 1) draws it from the centre out: spokes
+ * first, then the rings one by one.
+ */
+export function drawWeb(ctx: CanvasRenderingContext2D, c: Point, radius: number, alpha: number, build = 1): void {
+  if (alpha <= 0 || radius <= 0) return;
+  const spokes = 8;
+  const rings = 4;
+  // Offset by half a step so that the octagon has flat top and bottom edges.
+  const angle = (i: number) => ((i + 0.5) / spokes) * Math.PI * 2;
+  const at = (i: number, r: number) => ({ x: c.x + Math.cos(angle(i)) * r, y: c.y + Math.sin(angle(i)) * r });
+  const polygon = (r: number) => {
+    ctx.beginPath();
+    for (let i = 0; i < spokes; i++) {
+      const p = at(i, r);
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+  };
+  const spokeLength = radius * Math.min(1, build * 2.2);
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.strokeStyle = LINE;
   ctx.lineWidth = 1;
-  ctx.fillStyle = 'rgba(240, 244, 248, 0.05)';
-  ctx.beginPath();
-  for (let i = 0; i < spokes; i++) ctx.lineTo(c.x + Math.cos(angle(i)) * radiusAt(i), c.y + Math.sin(angle(i)) * radiusAt(i));
-  ctx.closePath();
+  ctx.strokeStyle = LINE;
+  ctx.fillStyle = 'rgba(240, 244, 248, 0.045)';
+  polygon(spokeLength);
   ctx.fill();
   ctx.beginPath();
   for (let i = 0; i < spokes; i++) {
+    const p = at(i, spokeLength);
     ctx.moveTo(c.x, c.y);
-    ctx.lineTo(c.x + Math.cos(angle(i)) * radiusAt(i), c.y + Math.sin(angle(i)) * radiusAt(i));
-  }
-  for (let r = 1; r <= rings; r++) {
-    const f = r / (rings + 0.4);
-    for (let i = 0; i <= spokes; i++) {
-      const a = angle(i % spokes);
-      const p = { x: c.x + Math.cos(a) * radiusAt(i % spokes) * f, y: c.y + Math.sin(a) * radiusAt(i % spokes) * f };
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      // Sagging threads between spokes.
-      else {
-        const pa = angle((i - 1) % spokes);
-        const mid = (pa + a) / 2;
-        const sag = radiusAt(i % spokes) * f * 0.9;
-        ctx.quadraticCurveTo(c.x + Math.cos(mid) * sag, c.y + Math.sin(mid) * sag, p.x, p.y);
-      }
-    }
+    ctx.lineTo(p.x, p.y);
   }
   ctx.stroke();
+  ctx.fillStyle = LINE;
+  for (let k = 1; k <= rings; k++) {
+    const shown = Math.max(0, Math.min(1, (build - 0.4 - k * 0.1) / 0.1));
+    if (shown <= 0) continue;
+    const r = (radius * k) / rings;
+    ctx.globalAlpha = alpha * shown * (k === rings ? 1 : 0.8);
+    polygon(r);
+    ctx.stroke();
+    for (let i = 0; i < spokes; i++) {
+      const p = at(i, r);
+      ctx.fillRect(Math.round(p.x) - 1, Math.round(p.y) - 1, 2.5, 2.5);
+    }
+  }
+  // A small crosshair at the hub.
+  ctx.globalAlpha = alpha;
+  ctx.strokeRect(Math.round(c.x) - 2.5, Math.round(c.y) - 2.5, 5, 5);
   ctx.restore();
 }
 

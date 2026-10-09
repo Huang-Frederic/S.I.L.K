@@ -63,10 +63,20 @@ class WebTrap {
   }
 
   draw(ctx: CanvasRenderingContext2D): void {
-    const grow = Math.min(1, this.t / 0.22);
+    const build = Math.min(1, this.t / 0.3);
     const fade = this.t > this.seconds ? 1 - (this.t - this.seconds) / 0.5 : 1;
+    ctx.save();
     this.pane.enterContent(ctx);
-    drawWeb(ctx, this.c, this.radius * (0.3 + 0.7 * grow), 0.9 * fade, this.c.x * 0.01);
+    drawWeb(ctx, this.c, this.radius, 0.9 * fade, build);
+    ctx.restore();
+    // How long the links stay stuck (kept inside the pane).
+    if (build >= 1 && this.t < this.seconds) {
+      const r = this.pane.rect;
+      const at = this.pane.toStage({ x: this.c.x - this.radius * 0.5, y: this.c.y - this.radius * 0.96 });
+      const x = Math.min(Math.max(at.x, r.left + 10), r.right - 150);
+      const y = Math.min(Math.max(at.y, r.top + 16), r.bottom - 16);
+      drawLabel(ctx, `web.trap · ${(this.seconds - this.t).toFixed(1)}s`, x, y, LINE);
+    }
   }
 }
 

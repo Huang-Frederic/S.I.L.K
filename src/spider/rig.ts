@@ -150,6 +150,14 @@ export class SpiderRig {
     return this.toWorld({ x: 0, y: -HALF_H });
   }
 
+  /** Stretch of the most stretched leg, as a fraction of the reach. */
+  maxStretch(): number {
+    return Math.max(...this.legs.map((leg) => {
+      const hip = this.toWorld(leg.hip);
+      return Math.hypot(leg.foot.x - hip.x, leg.foot.y - hip.y) / this.reach;
+    }));
+  }
+
   /** Words currently under a planted foot. */
   heldWords(): Word[] {
     return this.legs.filter((l) => l.t >= 1 && l.word && !l.word.gone).map((l) => l.word!);
@@ -181,7 +189,11 @@ export class SpiderRig {
   /** Lifts every foot: legs then follow the body (hanging, flying, diving). */
   liftAll(): void {
     this.grounded = false;
-    for (const leg of this.legs) leg.word = null;
+    for (const leg of this.legs) {
+      leg.word = null;
+      leg.foot = leg.from = leg.to = this.restFoot(leg, { x: 0, y: 0 });
+      leg.t = 1;
+    }
   }
 
   update(dt: number, ground: Ground = OPEN_GROUND): void {
@@ -222,12 +234,16 @@ export class SpiderRig {
     }
     if (this.pose === 'dance') return;
 
-    // New steps. Strict tetrapod: while any foot is in the air nothing else
-    // lifts; then the group whose turn it is steps together (every leg of it
-    // that is stretched past 90 % or left behind), and the turn passes.
-    if (this.legs.some((leg) => leg.t < 1)) return;
+    // New steps. Tetrapod: the group whose turn it is steps together (every
+    // leg of it stretched past 90 % or left behind), then the turn passes.
+    // Walking, nothing lifts while a foot is in the air; running, the next
+    // group may lift once the airborne feet are most of the way there.
     const speed = Math.hypot(this.vx, this.vy);
-    const leadLength = Math.min(40, speed * 0.32) * this.size;
+    const overlap = speed > 220 ? 0.55 : 1;
+    if (this.legs.some((leg) => leg.t < overlap)) return;
+    if (overlap < 1 && this.legs.some((leg) => leg.t < 1 && leg.group === this.turn)) return;
+    // Feet land ahead of the body by about the distance it covers in a step.
+    const leadLength = Math.min(80, 6 + speed * 0.075) * this.size;
     const lead = speed > 1 ? { x: (this.vx / speed) * leadLength, y: (this.vy / speed) * leadLength } : { x: 0, y: 0 };
     const reach = this.reach;
     const urgency = (leg: Leg) => {
@@ -245,13 +261,13 @@ export class SpiderRig {
       if (!due(group).some((s) => s.value > 1)) return;
     }
     for (const { leg, ideal, value } of due(group)) {
-      if (value < 0.55) continue; // nearly in place: stays down
+      if (leg.t < 1 || value < 0.55) continue; // still landing, or nearly in place
       const hold = ground.hold(ideal);
       const distance = Math.hypot(hold.point.x - leg.foot.x, hold.point.y - leg.foot.y);
       leg.from = { ...leg.foot };
       leg.to = hold.point;
       leg.word = hold.word;
-      leg.duration = Math.max(0.05, Math.min(0.18, distance / Math.max(260, speed * 3)));
+      leg.duration = Math.max(0.04, Math.min(0.18, distance / Math.max(260, speed * 4)));
       leg.t = 0;
     }
     this.turn = 1 - group;
@@ -347,6 +363,9 @@ export class SpiderRig {
       }
       const lifting = leg.t < 1 ? Math.sin(leg.t * Math.PI) : 0;
       const shrink = 1 - 0.1 * lifting - 0.22 * this.fold;
+      const length = (FEMUR + TIBIA) * k * shrink;
+      const span = Math.hypot(foot.x - hip.x, foot.y - hip.y);
+      if (span > length) foot = { x: hip.x + ((foot.x - hip.x) / span) * length, y: hip.y + ((foot.y - hip.y) / span) * length };
       const knee = solveKnee(hip, foot, FEMUR * k * shrink, TIBIA * k * shrink, { x: this.x, y: this.y });
       ctx.moveTo(hip.x, hip.y);
       ctx.lineTo(knee.x, knee.y);

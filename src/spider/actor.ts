@@ -38,8 +38,9 @@ export class Interrupted extends Error {
 
 /** Speeds of the current difficulty (rage included). */
 export interface ActorSpeeds {
-  /** Crawling speed (px/s). */
+  /** Crawling speed (px/s), and the running multiplier for far links. */
   walk: number;
+  sprint: number;
   /** Web zip speed (px/s) and the distance beyond which the spider zips. */
   zip: number;
   zipBeyond: number;
@@ -99,6 +100,10 @@ export class SpiderActor implements Drawable {
   private edges: EdgeGlitch | null = null;
   private grabbed: HTMLAnchorElement | null = null;
   private camY = 0;
+  /** Current walking speed (px/s), for the camera. */
+  private speedNow = 0;
+  /** Where the word index was last extended around the body. */
+  private ensuredAt: Point | null = null;
   private readonly ground: Ground = { hold: (p) => this.footHold(p) };
   private readonly removeFromStage: () => void;
 
@@ -264,7 +269,9 @@ export class SpiderActor implements Drawable {
     if (max <= 0) return;
     if (Math.abs(this.camY - sc.scrollTop) > 2) this.camY = sc.scrollTop;
     const target = cameraTarget(this.rig.y, sc.clientHeight, sc.scrollHeight);
-    this.camY += (target - this.camY) * (1 - Math.exp(-dt * (this.zipLine ? 12 : 4.5)));
+    // The camera keeps up with a running spider.
+    const follow = this.zipLine ? 12 : 4.5 + this.speedNow / 110;
+    this.camY += (target - this.camY) * (1 - Math.exp(-dt * follow));
     const rounded = Math.round(this.camY);
     if (rounded !== sc.scrollTop) sc.scrollTop = rounded;
   }
@@ -369,18 +376,25 @@ export class SpiderActor implements Drawable {
     this.wordsEaten++;
     this.onEat?.(this.wordsEaten);
     if (kind === 'eaten' && pane) {
-      this.fragments.burst(pane.toStage(center(word.box)), { count: 5, colors: [RED, LINE], speed: [12, 46], life: [0.2, 0.32], gravity: 30 });
+      this.fragments.burst(pane.toStage(center(word.box)), { count: 4, colors: [RED, LINE], speed: [12, 46], life: [0.2, 0.32], gravity: 30 });
     }
   }
 
-  /** Eats the word under the jaws (the body's centre). */
-  private eatUnderJaws(exclude: HTMLAnchorElement | null): void {
+  /** Eats every word under the body: it leaves a swath of destroyed text behind. */
+  private eatUnderBody(exclude: HTMLAnchorElement | null): void {
     const pane = this.surface;
     if (!pane) return;
-    const word = pane.words.nearest({ x: this.rig.x, y: this.rig.y }, 1.5, (w) => !w.gone && (!exclude || w.link !== exclude));
-    if (!word) return;
-    this.destroyWord(word);
-    this.status = `eat("${textOf(word.el)}") · words_eaten: ${this.wordsEaten}`;
+    const rig = this.rig;
+    const k = rig.size * rig.scale;
+    if (!this.ensuredAt || distance(this.ensuredAt, rig) > 40) {
+      this.ensuredAt = { x: rig.x, y: rig.y };
+      pane.words.ensure({ left: rig.x - 160, right: rig.x + 160, top: rig.y - 120, bottom: rig.y + 120 });
+    }
+    const box = { left: rig.x - 14 * k, right: rig.x + 14 * k, top: rig.y - 21 * k, bottom: rig.y + 21 * k };
+    const eaten = pane.words.inside(box, (w) => !w.gone && (!exclude || w.link !== exclude));
+    for (const word of eaten) this.destroyWord(word);
+    const last = eaten[eaten.length - 1];
+    if (last) this.status = `eat("${textOf(last.el)}") · words_eaten: ${this.wordsEaten}`;
   }
 
   /** Words crossed by a segment (content coordinates), nearest first. */
@@ -602,29 +616,40 @@ export class SpiderActor implements Drawable {
     await this.walk(plan.end, anchor, false);
   }
 
-  /** Walks in a straight line, eating every word under its jaws. */
+  /**
+   * Walks in a straight line, eating every word under its body. Far from the
+   * goal it breaks into a run (up to `sprint` times its walking speed) and
+   * slows down again as it gets close.
+   */
   private async walk(to: Point, exclude: HTMLAnchorElement | null, mischief: boolean): Promise<void> {
     const rig = this.rig;
     let speed = 0;
-    for (;;) {
-      const dt = await this.frame();
-      if (this.holds > 0) {
-        speed = 0;
-        continue;
+    try {
+      for (;;) {
+        const dt = await this.frame();
+        if (this.holds > 0) {
+          speed = 0;
+          this.speedNow = 0;
+          continue;
+        }
+        const sp = this.speeds();
+        const dx = to.x - rig.x;
+        const dy = to.y - rig.y;
+        const d = Math.hypot(dx, dy);
+        if (d < 0.6) break;
+        const cruise = sp.walk * (1 + (sp.sprint - 1) * Math.min(1, d / 1000));
+        speed += Math.sign(cruise - speed) * Math.min(Math.abs(cruise - speed), sp.walk * dt * 6);
+        const v = Math.min(speed, Math.max(sp.walk * 0.3, d * 5));
+        const stepLength = Math.min(d, v * dt);
+        rig.x += (dx / d) * stepLength;
+        rig.y += (dy / d) * stepLength;
+        rig.lookAt = to;
+        this.speedNow = v;
+        this.eatUnderBody(exclude);
+        if (mischief && d > 60 && Math.random() < sp.mischief * dt) await this.mischief(exclude);
       }
-      const sp = this.speeds();
-      const dx = to.x - rig.x;
-      const dy = to.y - rig.y;
-      const d = Math.hypot(dx, dy);
-      if (d < 0.6) break;
-      speed = Math.min(sp.walk, speed + sp.walk * dt * 5);
-      const v = Math.min(speed, Math.max(sp.walk * 0.3, d * 5));
-      const stepLength = Math.min(d, v * dt);
-      rig.x += (dx / d) * stepLength;
-      rig.y += (dy / d) * stepLength;
-      rig.lookAt = to;
-      this.eatUnderJaws(exclude);
-      if (mischief && d > 60 && Math.random() < sp.mischief * dt) await this.mischief(exclude);
+    } finally {
+      this.speedNow = 0;
     }
   }
 
@@ -660,9 +685,10 @@ export class SpiderActor implements Drawable {
   /** A random destruction move while crawling. */
   private async mischief(exclude: HTMLAnchorElement | null): Promise<void> {
     const r = Math.random();
-    if (r < 0.4) await this.yeet(exclude);
-    else if (r < 0.72) await this.stomp(exclude);
-    else await this.laserCut(exclude);
+    if (r < 0.32) await this.yeet(exclude);
+    else if (r < 0.62) await this.stomp(exclude);
+    else if (r < 0.82) await this.laserCut(exclude);
+    else await this.laserSweep(exclude);
   }
 
   /** grab(word).throw(): a front leg plucks a word and flings it off the page. */
@@ -723,6 +749,31 @@ export class SpiderActor implements Drawable {
     await this.wait(this.d(0.08));
     this.sliceWord(word);
     await this.wait(this.d(0.16));
+  }
+
+  /** eye.laser.sweep(): the beam runs along a line and cuts every word on it. */
+  async laserSweep(exclude: HTMLAnchorElement | null = null): Promise<void> {
+    const pane = this.surface;
+    if (!pane) return;
+    const rig = this.rig;
+    const eye = rig.eye();
+    pane.words.ensure({ left: eye.x - 300, right: eye.x + 300, top: eye.y - 160, bottom: eye.y + 160 });
+    const first = pane.words.nearest({ x: eye.x + (Math.random() - 0.5) * 200, y: eye.y + (Math.random() < 0.5 ? -70 : 70) }, 90, (w) => !w.gone && w.link !== exclude);
+    if (!first) return;
+    const cy = (first.box.top + first.box.bottom) / 2;
+    const row = pane.words
+      .inside({ left: first.box.left - 1, right: first.box.left + 360, top: cy - 4, bottom: cy + 4 }, (w) => !w.gone && w.link !== exclude)
+      .sort((a, b) => a.box.left - b.box.left)
+      .slice(0, 2 + Math.floor(Math.random() * 3));
+    this.status = `eye.laser.sweep(${row.length} words)`;
+    for (const word of row) {
+      const to = center(word.box);
+      rig.lookAt = to;
+      this.beam(() => to, this.d(0.12));
+      this.sliceWord(word);
+      await this.wait(this.d(0.07));
+    }
+    this.stage.shake(1.5);
   }
 
   // ------------------------------------------------------------ 03 · grab

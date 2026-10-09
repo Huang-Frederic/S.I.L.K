@@ -208,6 +208,7 @@ export class RaceScreen {
     const k = this.rage ? RAGE.speed : 1;
     return {
       walk: d.walkSpeed * k,
+      sprint: d.sprint,
       zip: d.zipSpeed * k,
       zipBeyond: d.zipBeyond,
       mischief: d.mischief,
