@@ -320,6 +320,7 @@ export class RacerPane implements Surface {
   damageLink(anchor: HTMLAnchorElement, kind: LinkDamage, until = Infinity): void {
     const current = this.damage.get(anchor);
     if (current && (current.kind === 'burned' || current.kind === 'eaten')) return;
+    if (current) anchor.classList.remove(`is-${current.kind}`);
     this.damage.set(anchor, { kind, until });
     anchor.classList.add('is-damaged', `is-${kind}`);
     anchor.setAttribute('aria-disabled', 'true');

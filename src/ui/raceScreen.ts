@@ -5,23 +5,27 @@
  * the spider crawls, leaps between panes and attacks.
  *
  * Rules:
- *  - the first racer on the target wins, by official time (arrival plus
- *    penalties): a player who arrives with decoy penalties is in a photo
- *    finish, and the spider can still win until the penalties have run out;
- *  - a link snatch moves the spider into the player's pane and swaps the
- *    panes' owners: the player carries on from the spider's former page;
+ *  - the first racer on the target wins;
+ *  - a fake link (Hard) leads nowhere: clicking it lets out mini-spiders
+ *    that eat the player's links;
+ *  - a link snatch (Hard, at most once a race) answers a click that would
+ *    put the player ahead: the spider leaps across, eats that link, dives in,
+ *    and the panes swap owners: the player carries on from the spider's
+ *    former page;
  *  - when the spider wins it walks to the middle of the screen, eats the
  *    YOU badge and dances; when the player wins it collapses;
  *  - the race pauses while the browser tab is hidden.
  */
 import { Director } from '../attacks/director';
 import { type AttackContext } from '../attacks/context';
+import { releaseMinis } from '../attacks/minions';
 import { SpeechBubble } from '../fx/bubble';
-import { AMBER, Fragments, RED, strokeBox, drawLabel } from '../fx/fx';
+import { AMBER, Fragments, RED, strokeBox } from '../fx/fx';
 import { TauntPicker, type TauntEvent } from '../game/comedy';
 import { RAGE, type Difficulty } from '../game/difficulty';
 import type { ValidatedPair } from '../game/pairs';
 import { Race } from '../game/race';
+import { linkCloseness, maySnatch, pageCloseness, type Lookup } from '../game/snatch';
 import { settings } from '../settings';
 import { SpiderActor } from '../spider/actor';
 import { SpiderAgent } from '../spider/ai/agent';
@@ -47,8 +51,10 @@ export interface RaceResult {
   /** The spider's page links to the target (it was one link away). */
   spiderOneAway: boolean;
   gaveUp: boolean;
-  /** The race went to a photo finish (the player arrived with penalties). */
-  photoFinish: boolean;
+  /** Fake links the player clicked. */
+  decoysClicked: number;
+  /** The spider stole one of the player's links. */
+  snatched: boolean;
   /** Hard wins in this browser, after this race. */
   hardWins: number;
 }
@@ -66,8 +72,8 @@ export interface RaceScreenOptions {
   onFinish: (result: RaceResult) => void;
 }
 
-/** loading -> countdown -> racing -> (photo) -> finishing -> over */
-type Phase = 'loading' | 'countdown' | 'racing' | 'photo' | 'finishing' | 'over';
+/** loading -> countdown -> racing -> finishing -> over */
+type Phase = 'loading' | 'countdown' | 'racing' | 'finishing' | 'over';
 
 const BASE_TITLE = 'S.I.L.K: Spider Indexing Links & Knowledge';
 /** How long to wait for the embedding model before starting anyway. */
@@ -88,7 +94,6 @@ export class RaceScreen {
   private readonly bubble: SpeechBubble;
   private readonly taunts: TauntPicker;
   private readonly clockEl: HTMLElement;
-  private readonly penaltyEl: HTMLElement;
   private readonly giveUpBtn: HTMLButtonElement;
   private readonly overlay: HTMLElement;
   private readonly liveEl: HTMLElement;
@@ -96,10 +101,14 @@ export class RaceScreen {
   private director: Director | null = null;
   private agent: SpiderAgent<SpiderArticlePage> | null = null;
   private profile: TargetProfile | null = null;
+  private attackCtx: AttackContext | null = null;
   private phase: Phase = 'loading';
   private destroyed = false;
   private gaveUp = false;
-  private hadPhotoFinish = false;
+  private decoysClicked = 0;
+  /** Link snatches so far, and the race time of the last one (s). */
+  private snatches = 0;
+  private lastSnatchAt: number | null = null;
   /** The player's pages, for the back button. */
   private history: string[] = [];
   private navToken = 0;
@@ -134,8 +143,6 @@ export class RaceScreen {
     }
 
     this.clockEl = h('span', { class: 'hud-clock', text: '00:00', attrs: { role: 'timer', 'aria-label': 'Race time' } });
-    this.penaltyEl = h('span', { class: 'hud-penalty', attrs: { title: 'Time penalty (decoy links)' } });
-    this.penaltyEl.hidden = true;
     this.giveUpBtn = h('button', { class: 'btn btn-ghost hud-giveup', text: 'Give up', attrs: { type: 'button' }, on: { click: () => this.giveUp() } });
     this.giveUpBtn.disabled = true;
     this.overlay = h('div', { class: 'race-overlay' });
@@ -159,7 +166,6 @@ export class RaceScreen {
           'div',
           { class: 'hud-right' },
           this.clockEl,
-          this.penaltyEl,
           h('span', { class: `hud-difficulty is-${difficulty.id}`, text: difficulty.label, attrs: { title: difficulty.blurb } }),
           this.giveUpBtn,
         ),
@@ -313,11 +319,10 @@ export class RaceScreen {
       isTarget: (title) => this.isTarget(title),
       say: (event) => this.say(event),
     };
+    this.attackCtx = ctx;
     this.director = new Director(ctx, runner, {
       active: () => this.phase === 'racing',
       rage: () => this.rage,
-      visited: (title) => agent.brain.hasVisited(title),
-      isBridge: (title) => profile.backlinks.has(title),
     });
 
     // The spider's copy of the start page loads behind the countdown.
@@ -378,7 +383,6 @@ export class RaceScreen {
       this.lastPlayerMove = this.stage.time;
       this.say('player-slow');
     }
-    if (this.phase === 'photo') this.tickPhotoFinish();
   }
 
   /** Amber dashed box and "hop N → Title" under the (possibly dragged) cursor. */
@@ -460,15 +464,41 @@ export class RaceScreen {
     if (pane.owner !== 'player' || this.phase !== 'racing' || !title) return;
     // Mid-snatch, the spider owns the moment.
     if (this.runner?.snatching) return;
-    if (anchor.dataset.decoy) {
-      this.clickDecoy(pane, anchor);
-      return;
-    }
     if (!pane.usable(anchor)) {
       this.say('blocked-click');
       return;
     }
+    if (anchor.dataset.decoy) {
+      this.clickDecoy(pane, anchor);
+      return;
+    }
+    if (!this.navBusy && this.trySnatch(pane, title, anchor)) return;
     void this.navigate(title, 'link');
+  }
+
+  /**
+   * Hard: the spider may steal the link the player just clicked, when that
+   * link would put the player ahead (rules in game/snatch.ts).
+   */
+  private trySnatch(pane: RacerPane, title: string, anchor: HTMLAnchorElement): boolean {
+    const rule = this.options.difficulty.snatch;
+    const { runner, agent, profile } = this;
+    if (!rule || !runner?.canSnatch || !agent || !profile) return false;
+    const lookup: Lookup = { isTarget: (t) => this.isTarget(t), isBridge: (t) => profile.backlinks.has(t) };
+    const now = this.race.clock.elapsed() / 1000;
+    const allowed = maySnatch(rule, {
+      now,
+      playerLinks: this.race.player.path.filter((step) => step.via === 'link').length,
+      done: this.snatches,
+      lastAt: this.lastSnatchAt,
+      link: linkCloseness(title, lookup),
+      spider: pageCloseness(agent.page.links, lookup),
+      visited: agent.brain.hasVisited(title),
+    });
+    if (!allowed || !runner.requestSnatch({ pane, anchor, title })) return false;
+    this.snatches++;
+    this.lastSnatchAt = now;
+    return true;
   }
 
   /** Forgets the player's pending click (the spider is stealing it). */
@@ -526,7 +556,6 @@ export class RaceScreen {
     this.updateHeaders();
     if (arrived) {
       if (this.race.winner === 'player') void this.playerWins();
-      else this.startPhotoFinish();
       return;
     }
     this.updatePlayerNear(loaded);
@@ -539,28 +568,18 @@ export class RaceScreen {
     this.playerNearTarget = !!loaded && linksOfBody(loaded.article.body).some((l) => this.isTarget(l.title));
   }
 
+  /** A fake link bursts open and lets out mini-spiders (no time lost, but they eat links). */
   private clickDecoy(pane: RacerPane, decoy: HTMLAnchorElement): void {
-    const penalty = this.options.difficulty.decoyPenaltyMs;
-    this.race.penalize('player', penalty);
-    const box = pane.boxToStage(pane.linkBox(decoy));
-    this.fragments.burst({ x: (box.left + box.right) / 2, y: (box.top + box.bottom) / 2 }, { count: 30, colors: [RED, '#88A3E8', '#F0F4F8'], speed: [40, 160], life: [0.3, 0.6], gravity: 160 });
+    const box = pane.linkBox(decoy);
+    const at = { x: (box.left + box.right) / 2, y: (box.top + box.bottom) / 2 };
+    this.fragments.burst(pane.toStage(at), { count: 30, colors: [RED, '#88A3E8', '#F0F4F8'], speed: [40, 160], life: [0.3, 0.6], gravity: 160 });
     decoy.replaceWith(document.createTextNode(''));
     pane.words.relayout();
-    const at = { x: box.left, y: box.top };
-    const start = this.stage.time;
-    this.stage.add({
-      z: Z.bubbles,
-      update: () => this.stage.time - start < 1.2,
-      draw: (ctx) => {
-        const u = (this.stage.time - start) / 1.2;
-        ctx.globalAlpha = 1 - u * u;
-        drawLabel(ctx, `+${Math.round(penalty / 1000)} s`, at.x, at.y - 30 * u, RED, { fill: true });
-      },
-    });
+    this.decoysClicked++;
+    if (this.attackCtx) releaseMinis(this.attackCtx, pane, at, this.options.difficulty.decoyMinis);
     this.stage.shake(3);
     this.say('decoy-clicked');
-    this.announce(`Fake link! ${Math.round(penalty / 1000)} second penalty.`);
-    this.updateHeaders();
+    this.announce('Fake link! Mini-spiders are going for your links.');
   }
 
   private giveUp(): void {
@@ -630,31 +649,9 @@ export class RaceScreen {
     this.director?.stop(true);
     this.say('spider-loses', true);
     this.announce('The spider gave up.');
-    if (this.phase === 'photo') this.tickPhotoFinish();
   }
 
   // -------------------------------------------------------------- endings
-
-  private startPhotoFinish(): void {
-    this.phase = 'photo';
-    this.hadPhotoFinish = true;
-    this.director?.stop(true);
-    this.giveUpBtn.disabled = true;
-    const banner = h('div', { class: 'photo-finish' }, h('strong', { text: 'Photo finish' }), h('span', { class: 'photo-count' }));
-    this.playerPane.element.append(banner);
-    this.announce('You reached the target, but your penalty keeps the race open.');
-    this.tickPhotoFinish();
-  }
-
-  private tickPhotoFinish(): void {
-    const winner = this.race.settle();
-    const banner = this.element.querySelector('.photo-count');
-    const pending = this.race.photoFinish;
-    if (banner && pending) {
-      banner.textContent = `+${Math.round(this.race.player.penaltyMs / 1000)} s penalty · official time in ${((pending.until - this.race.clock.elapsed()) / 1000).toFixed(1)} s`;
-    }
-    if (winner === 'player' && this.phase === 'photo') void this.playerWins();
-  }
 
   private async playerWins(): Promise<void> {
     if (this.phase === 'finishing' || this.phase === 'over') return;
@@ -662,7 +659,6 @@ export class RaceScreen {
     this.race.clock.pause();
     this.giveUpBtn.disabled = true;
     this.director?.stop(true);
-    this.element.querySelector('.photo-finish')?.remove();
     const hard = this.options.difficulty.id === 'hard';
     if (hard) settings.recordHardWin();
     await this.runner?.stop();
@@ -683,7 +679,6 @@ export class RaceScreen {
     this.race.clock.pause();
     this.giveUpBtn.disabled = true;
     this.director?.stop(true);
-    this.element.querySelector('.photo-finish')?.remove();
     if (this.gaveUp) await this.runner?.stop();
     const badge = this.playerPane.badgeElement;
     try {
@@ -709,20 +704,21 @@ export class RaceScreen {
       wordsEaten: this.actor.wordsEaten,
       spiderOneAway,
       gaveUp: this.gaveUp,
-      photoFinish: this.hadPhotoFinish,
+      decoysClicked: this.decoysClicked,
+      snatched: this.snatches > 0,
       hardWins: settings.hardWins,
     });
   }
 
   private handleVisibility(): void {
-    const live = this.phase === 'racing' || this.phase === 'photo' || this.phase === 'finishing';
+    const live = this.phase === 'racing' || this.phase === 'finishing';
     if (!live) return;
     if (document.hidden) {
       this.race.clock.pause();
       this.stage.pause();
       return;
     }
-    if (this.phase === 'racing' || this.phase === 'photo') this.race.clock.start();
+    if (this.phase === 'racing') this.race.clock.start();
     this.stage.resume();
   }
 
@@ -749,8 +745,6 @@ export class RaceScreen {
     playerPane.setBackEnabled(this.phase === 'racing' && !this.navBusy && this.history.length >= 2);
     spiderPane.setHops(spider.hops);
     spiderPane.setCrumbs(spider.path.map((s) => s.title));
-    this.penaltyEl.hidden = player.penaltyMs <= 0;
-    this.penaltyEl.textContent = `+${Math.round(player.penaltyMs / 1000)}s`;
   }
 
   private showOverlay(content: HTMLElement): void {

@@ -326,6 +326,29 @@ ul.wiki-plainlist {
   outline-offset: 1px;
 }
 
+/* Burned by the fan laser: flares white-hot, then cools down to charred embers. */
+.sw-burned {
+  color: rgba(255, 86, 66, 0.34) !important;
+  text-decoration: line-through !important;
+  text-decoration-color: rgba(255, 43, 58, 0.55) !important;
+  text-shadow: 0 0 5px rgba(255, 43, 58, 0.45);
+  animation: sw-ignite 0.9s ease-out;
+}
+
+@keyframes sw-ignite {
+  0% {
+    color: #fff4e8;
+    text-shadow:
+      0 0 10px #ffd6da,
+      0 0 22px #ff2b3a;
+  }
+
+  35% {
+    color: #ff2b3a;
+    text-shadow: 0 0 10px rgba(255, 43, 58, 0.95);
+  }
+}
+
 /* Stomped: squashed flat. */
 .sw-squashed {
   display: inline-block;

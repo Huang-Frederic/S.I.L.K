@@ -5,22 +5,36 @@
  *
  *  - Easy: it only crawls and destroys its own page. No attacks. Slow
  *    thinking. Winnable.
- *  - Normal: adds web traps, laser snipes and word bombardments, about every
+ *  - Normal: adds web traps, fan lasers and word bombardments, about every
  *    25 s (more often in rage). Hard but winnable.
- *  - Hard: everything, every 4-8 s, chained, with no warning; it runs across
- *    the page smashing the text, snatches the
- *    links you reach for, plants decoys, lays eggs, turns off the lights and
- *    tugs your cursor. Rage is always on. Expected win rate: almost zero.
+ *  - Hard: an attack every 4-8 s, chained, with no warning: webs, fan
+ *    lasers, word bombs, fake target links full of mini-spiders and, now and
+ *    then, a silk line on the cursor. Once a race it steals the link that
+ *    would put the player ahead. It runs across the page smashing the text;
+ *    rage is always on. Expected win rate: almost zero.
  *
  * Attacks never come with a telegraph: they land instantly.
  */
 export type DifficultyId = 'easy' | 'normal' | 'hard';
 
 /** Attacks the spider can launch at the player's pane. */
-export type AttackId = 'web' | 'laser' | 'bombard' | 'decoy' | 'eggs' | 'blackout' | 'harass';
+export type AttackId = 'web' | 'laser' | 'bombard' | 'decoy' | 'harass';
 
 /** When the spider is in rage mode (faster, angrier, glowing eye). */
 export type RageRule = 'never' | 'near-target' | 'always';
+
+/**
+ * Link snatch: the spider steals the link the player clicks, but only when
+ * that link would put the player ahead (see game/snatch.ts).
+ */
+export interface SnatchRule {
+  /** The player's first links are safe: no snatch before this many link hops. */
+  safeHops: number;
+  /** Snatches per race. */
+  perRace: number;
+  /** Seconds after the start of the race (or the last snatch) before a snatch. */
+  cooldown: number;
+}
 
 export interface Difficulty {
   id: DifficultyId;
@@ -51,18 +65,20 @@ export interface Difficulty {
   firstAttack: number;
   /** Chance that an attack is immediately followed by another one. */
   chain: number;
-  /** Link snatch: distance from the cursor (px) and cooldown (s). Hard only. */
-  snatch: { radius: number; cooldown: number } | null;
+  /** Width of the fan laser's sweep (degrees). */
+  laserFan: number;
+  /** Link snatch (Hard only). */
+  snatch: SnatchRule | null;
   rage: RageRule;
   /** How long webbed and covered links stay blocked (s). */
   webSeconds: number;
   coverSeconds: number;
-  blackoutSeconds: number;
-  hatchSeconds: number;
+  /** How long the silk drags the cursor (s), and the least time between two drags (s). */
   harassSeconds: number;
-  /** Decoy target links planted at once, and the time penalty for clicking one. */
+  harassGap: number;
+  /** Fake target links planted at once, and the mini-spiders that burst out of one when clicked. */
   maxDecoys: number;
-  decoyPenaltyMs: number;
+  decoyMinis: number;
   /** How talkative the spider is (0..1): the chance of a taunt at each key moment. */
   taunts: number;
 }
@@ -83,21 +99,21 @@ export const DIFFICULTIES: Record<DifficultyId, Difficulty> = {
     cooldown: [999, 999],
     firstAttack: 999,
     chain: 0,
+    laserFan: 0,
     snatch: null,
     rage: 'never',
     webSeconds: 0,
     coverSeconds: 0,
-    blackoutSeconds: 0,
-    hatchSeconds: 3,
     harassSeconds: 0,
+    harassGap: 0,
     maxDecoys: 0,
-    decoyPenaltyMs: 0,
+    decoyMinis: 0,
     taunts: 0.35,
   },
   normal: {
     id: 'normal',
     label: 'Normal',
-    blurb: 'Web traps, laser snipes and word bombs, about every 25 s. Hard but winnable.',
+    blurb: 'Web traps, fan lasers and word bombs, about every 25 s. Hard but winnable.',
     thinkMs: 3200,
     walkSpeed: 125,
     sprint: 2.4,
@@ -109,21 +125,21 @@ export const DIFFICULTIES: Record<DifficultyId, Difficulty> = {
     cooldown: [22, 28],
     firstAttack: 14,
     chain: 0,
+    laserFan: 16,
     snatch: null,
     rage: 'near-target',
     webSeconds: 7,
     coverSeconds: 8,
-    blackoutSeconds: 0,
-    hatchSeconds: 3,
     harassSeconds: 0,
+    harassGap: 0,
     maxDecoys: 0,
-    decoyPenaltyMs: 15_000,
+    decoyMinis: 0,
     taunts: 0.7,
   },
   hard: {
     id: 'hard',
     label: 'Hard',
-    blurb: 'Everything, every few seconds, no warning. It steals the links you reach for. Expected win rate: almost zero.',
+    blurb: 'Everything, every few seconds, no warning. Once a race it steals the link that would put you ahead. Expected win rate: almost zero.',
     thinkMs: 250,
     walkSpeed: 300,
     sprint: 3,
@@ -131,19 +147,19 @@ export const DIFFICULTIES: Record<DifficultyId, Difficulty> = {
     zipBeyond: 5200,
     mischief: 1.1,
     crush: 0.55,
-    attacks: ['web', 'laser', 'bombard', 'decoy', 'eggs', 'blackout', 'harass'],
+    attacks: ['web', 'laser', 'bombard', 'decoy', 'harass'],
     cooldown: [4, 8],
     firstAttack: 3,
     chain: 0.55,
-    snatch: { radius: 120, cooldown: 8 },
+    laserFan: 24,
+    snatch: { safeHops: 3, perRace: 1, cooldown: 60 },
     rage: 'always',
     webSeconds: 9,
     coverSeconds: 10,
-    blackoutSeconds: 6,
-    hatchSeconds: 3,
     harassSeconds: 2,
+    harassGap: 45,
     maxDecoys: 3,
-    decoyPenaltyMs: 15_000,
+    decoyMinis: 3,
     taunts: 1,
   },
 };
@@ -154,7 +170,11 @@ export function isDifficultyId(value: unknown): value is DifficultyId {
   return value === 'easy' || value === 'normal' || value === 'hard';
 }
 
-/** In rage the spider thinks, walks and attacks faster. */
+/**
+ * In rage the spider thinks and walks faster, and attacks more often when
+ * the rage is a reaction (Normal, near the target): on Hard, where it is
+ * always on, the attack cadence stays the table's 4-8 s.
+ */
 export const RAGE = {
   think: 0.6,
   speed: 1.35,

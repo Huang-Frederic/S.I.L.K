@@ -5,18 +5,19 @@
  *
  *  - web trap:      silk shot across, a web unfolds over the links near the
  *                   cursor; they cannot be clicked for a few seconds
- *  - laser snipe:   the eye laser burns the link the player is reaching for
+ *  - fan laser:     a big beam from the eye sweeps a fan across the page and
+ *                   burns every word and link it passes over
  *  - bombardment:   words plucked from the spider's page are thrown across
  *                   and land on links, covering them
- *  - decoys:        fake links to the target appear in the text (+15 s)
- *  - blackout:      the pane goes dark but for a shrinking flashlight circle
+ *  - decoys:        fake links to the target appear in the text; clicking
+ *                   one lets out mini-spiders (see minions.ts)
  *  - harassment:    silk sticks to the cursor and the spider tugs it
- *  - eggs:          see minions.ts
  */
-import { AMBER, CYAN, drawLabel, drawLaser, drawSilk, drawWeb, flyWord, LINE, RED } from '../fx/fx';
+import { AMBER, CYAN, drawLabel, drawSilk, drawWeb, flyWord, LINE, RED } from '../fx/fx';
+import { segmentHitsBox } from '../spider/actor';
 import { drawWordTag } from '../spider/rig';
 import type { RacerPane } from '../stage/racerPane';
-import { Z, type Point, type Stage } from '../stage/stage';
+import { Z, type Box, type Point, type Stage } from '../stage/stage';
 import { circleHitsBox, center, focusPoint, rankLinks, type AttackContext } from './context';
 
 const FILLER_WORDS = ['nope', 'mine', 'lol', 'web', 'nom', 'denied', 'no'];
@@ -104,36 +105,180 @@ export async function webTrap(ctx: AttackContext): Promise<boolean> {
   return true;
 }
 
-// ---------------------------------------------------------- laser snipe
+// ------------------------------------------------------------ fan laser
 
-export async function laserSnipe(ctx: AttackContext): Promise<boolean> {
+/** Half the width of the strip the fan laser burns (px). */
+const BEAM_HALF = 7;
+
+/** How far along `dir` (a unit vector) a ray from `from` leaves `box`, or null if it misses it. */
+export function rayExit(from: Point, dir: Point, box: Box): number | null {
+  let t0 = -Infinity;
+  let t1 = Infinity;
+  const axes: Array<[number, number, number, number]> = [
+    [from.x, dir.x, box.left, box.right],
+    [from.y, dir.y, box.top, box.bottom],
+  ];
+  for (const [p, d, lo, hi] of axes) {
+    if (Math.abs(d) < 1e-9) {
+      if (p < lo || p > hi) return null;
+      continue;
+    }
+    const a = (lo - p) / d;
+    const b = (hi - p) / d;
+    t0 = Math.max(t0, Math.min(a, b));
+    t1 = Math.min(t1, Math.max(a, b));
+  }
+  return t1 >= Math.max(0, t0) ? t1 : null;
+}
+
+/** True when `p` lies inside the triangle a-b-c (either winding). */
+export function inTriangle(p: Point, a: Point, b: Point, c: Point): boolean {
+  const s1 = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+  const s2 = (c.x - b.x) * (p.y - b.y) - (c.y - b.y) * (p.x - b.x);
+  const s3 = (a.x - c.x) * (p.y - c.y) - (a.y - c.y) * (p.x - c.x);
+  return !((s1 < 0 || s2 < 0 || s3 < 0) && (s1 > 0 || s2 > 0 || s3 > 0));
+}
+
+const grow = (b: Box, by: number): Box => ({ left: b.left - by, top: b.top - by, right: b.right + by, bottom: b.bottom + by });
+
+/**
+ * Burns everything the beam swept over during one frame (the triangle
+ * between the eye and the beam's last two ends) in one pane: every visible
+ * word, and with it every link. Returns how many words burned.
+ */
+function burnSwept(ctx: AttackContext, pane: RacerPane, eye: Point, from: Point, to: Point): number {
+  const view = pane.visibleContent();
+  const e = pane.fromStage(eye);
+  const a = pane.fromStage(from);
+  const b = pane.fromStage(to);
+  const box = {
+    left: Math.max(view.left, Math.min(e.x, a.x, b.x) - BEAM_HALF),
+    right: Math.min(view.right, Math.max(e.x, a.x, b.x) + BEAM_HALF),
+    top: Math.max(view.top, Math.min(e.y, a.y, b.y) - BEAM_HALF),
+    bottom: Math.min(view.bottom, Math.max(e.y, a.y, b.y) + BEAM_HALF),
+  };
+  if (box.left >= box.right || box.top >= box.bottom) return 0;
+  pane.words.ensure(box);
+  let burned = 0;
+  for (const word of pane.words.inside(grow(box, 30))) {
+    const c = center(word.box);
+    if (!inTriangle(c, e, a, b) && !segmentHitsBox(e, b, grow(word.box, BEAM_HALF))) continue;
+    if (!ctx.actor.burnWord(pane, word)) continue;
+    burned++;
+    if (Math.random() < 0.6) ctx.fragments.burst(pane.toStage(c), { count: 2, colors: [RED, '#FFD6DA', AMBER], speed: [30, 120], life: [0.2, 0.45], gravity: 160 });
+  }
+  // Fake links are not part of the word index: burn them by their box.
+  if (pane.owner === 'player') {
+    for (const decoy of pane.decoys()) {
+      const d = pane.linkBox(decoy);
+      if (pane.usable(decoy) && (inTriangle(center(d), e, a, b) || segmentHitsBox(e, b, grow(d, BEAM_HALF)))) pane.damageLink(decoy, 'burned');
+    }
+  }
+  return burned;
+}
+
+/** The big beam: a red haze, a thick red line and a white-hot core. */
+function drawFanBeam(c: CanvasRenderingContext2D, from: Point, to: Point, strength: number, time: number): void {
+  if (strength <= 0) return;
+  const line = () => {
+    c.beginPath();
+    c.moveTo(from.x, from.y);
+    c.lineTo(to.x, to.y);
+    c.stroke();
+  };
+  c.save();
+  c.lineCap = 'round';
+  c.strokeStyle = RED;
+  c.shadowColor = 'rgba(255, 43, 58, 0.95)';
+  c.globalAlpha = 0.2 * strength;
+  c.lineWidth = 30;
+  c.shadowBlur = 28;
+  line();
+  c.globalAlpha = 0.85 * strength;
+  c.lineWidth = 10;
+  c.shadowBlur = 14;
+  line();
+  c.shadowBlur = 0;
+  c.globalAlpha = strength;
+  c.strokeStyle = '#FFE9EC';
+  c.lineWidth = 3.2 + Math.sin(time * 80) * 0.8;
+  line();
+  // Flare at the eye.
+  const flare = c.createRadialGradient(from.x, from.y, 0, from.x, from.y, 22);
+  flare.addColorStop(0, `rgba(255, 233, 236, ${strength})`);
+  flare.addColorStop(0.35, `rgba(255, 43, 58, ${0.8 * strength})`);
+  flare.addColorStop(1, 'rgba(255, 43, 58, 0)');
+  c.fillStyle = flare;
+  c.beginPath();
+  c.arc(from.x, from.y, 22, 0, Math.PI * 2);
+  c.fill();
+  c.restore();
+}
+
+/**
+ * eye.laser.fan(): a big beam from the eye sweeps across the player's pane
+ * in a fan centred on where the player is looking, and burns every word and
+ * every link it passes over, in both panes (the spider's own page included,
+ * but for the link it is heading to).
+ */
+export async function fanLaser(ctx: AttackContext): Promise<boolean> {
   const pane = ctx.playerPane();
-  const victim = rankLinks(ctx)[0];
-  if (!victim) return false;
-  const el = victim.el;
-  const at = () => pane.toStage(center(pane.linkBox(el)));
+  const home = ctx.actor.surface;
+  // Nothing left to burn on screen: another attack will do.
+  if (!home || home === pane || !rankLinks(ctx).length) return false;
+  const focus = pane.toStage(focusPoint(ctx, pane));
+  const span = (ctx.difficulty.laserFan * Math.PI) / 180;
+  const start = ctx.actor.eyeOnStage();
+  const middle = Math.atan2(focus.y - start.y, focus.x - start.x);
+  const turn = Math.random() < 0.5 ? 1 : -1;
+  const seconds = ctx.difficulty.id === 'hard' ? 0.75 : 0.95;
+  const rig = ctx.actor.rig;
+  // The beam reaches the far side of the player's pane.
+  const endOf = (eye: Point, angle: number): Point => {
+    const dir = { x: Math.cos(angle), y: Math.sin(angle) };
+    const length = rayExit(eye, dir, pane.rect) ?? Math.hypot(focus.x - eye.x, focus.y - eye.y);
+    return { x: eye.x + dir.x * length, y: eye.y + dir.y * length };
+  };
+  let angle = middle - (turn * span) / 2;
+  let strength = 0;
+  let live = true;
+  ctx.stage.add({
+    z: Z.projectiles,
+    update: () => live || (strength -= 0.08) > 0,
+    draw: (c, stage) => {
+      const eye = ctx.actor.eyeOnStage();
+      drawFanBeam(c, eye, endOf(eye, angle), strength, stage.time);
+    },
+  });
   ctx.actor.holds++;
+  ctx.actor.status = 'eye.laser.fan() → burn';
+  ctx.say('laser');
+  let burned = 0;
   try {
-    ctx.actor.status = 'eye.laser(player.link) → burn';
-    let t = 0;
-    const seconds = 0.42;
-    ctx.stage.add({
-      z: Z.projectiles,
-      update(dt) {
-        t += dt / seconds;
-        return t < 1;
-      },
-      draw: (c) => drawLaser(c, ctx.actor.eyeOnStage(), at(), 1 - t * t, 2.5),
+    let last = endOf(ctx.actor.eyeOnStage(), angle);
+    let shook = 0;
+    await ctx.stage.tween(seconds, (t) => {
+      const e = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+      angle = middle + turn * span * (e - 0.5);
+      strength = Math.min(1, t * 10);
+      const eye = ctx.actor.eyeOnStage();
+      const end = endOf(eye, angle);
+      // The eye leads the beam.
+      rig.face({ x: end.x - eye.x, y: end.y - eye.y });
+      rig.lookAt = home.fromStage(end);
+      burned += burnSwept(ctx, pane, eye, last, end) + burnSwept(ctx, home, eye, last, end);
+      last = end;
+      if (t - shook > 0.12) {
+        shook = t;
+        ctx.stage.shake(1.6);
+      }
     });
-    await ctx.stage.wait(0.05);
-    pane.damageLink(el, 'burned');
-    ctx.fragments.burst(at(), { count: 24, colors: [RED, '#FFD6DA', AMBER], speed: [40, 160], life: [0.2, 0.45], gravity: 150 });
-    ctx.stage.shake(2.5);
-    ctx.say('laser');
-    await ctx.stage.wait(0.3);
   } finally {
+    live = false;
     ctx.actor.holds--;
   }
+  ctx.actor.status = `eye.laser.fan() · ${burned} words burned`;
+  await ctx.stage.wait(0.15);
   return true;
 }
 
@@ -244,82 +389,6 @@ export async function plantDecoys(ctx: AttackContext): Promise<boolean> {
   ctx.say('decoy-planted');
   await ctx.stage.wait(0.15);
   return true;
-}
-
-// ------------------------------------------------------------ blackout
-
-class Blackout {
-  readonly z = Z.blackout;
-  private t = 0;
-  private last: Point | null = null;
-
-  constructor(
-    private readonly ctx: AttackContext,
-    private readonly seconds: number,
-  ) {}
-
-  update(dt: number): boolean {
-    this.t += dt;
-    return this.t < this.seconds + 0.3;
-  }
-
-  draw(c: CanvasRenderingContext2D): void {
-    const pane = this.ctx.playerPane();
-    const r = pane.rect;
-    const cursor = this.ctx.cursor;
-    if (cursor.available && pane.containsStage(cursor.position)) this.last = cursor.position;
-    const at = this.last ?? { x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 };
-    const alpha = Math.min(1, this.t / 0.1) * (this.t > this.seconds ? Math.max(0, 1 - (this.t - this.seconds) / 0.3) : 1);
-    // The flashlight shrinks over time.
-    const radius = 175 - 120 * Math.min(1, this.t / this.seconds);
-    c.beginPath();
-    c.rect(r.left, r.top, r.right - r.left, r.bottom - r.top);
-    c.clip();
-    const g = c.createRadialGradient(at.x, at.y, radius * 0.55, at.x, at.y, radius);
-    g.addColorStop(0, 'rgba(4, 5, 7, 0)');
-    g.addColorStop(1, `rgba(4, 5, 7, ${0.975 * alpha})`);
-    c.fillStyle = g;
-    c.fillRect(r.left, r.top, r.right - r.left, r.bottom - r.top);
-    c.globalAlpha = 0.25 * alpha;
-    c.strokeStyle = LINE;
-    c.beginPath();
-    c.arc(at.x, at.y, radius * 0.96, 0, Math.PI * 2);
-    c.stroke();
-    c.globalAlpha = alpha;
-    drawLabel(c, `LIGHTS OUT · ${Math.max(0, this.seconds - this.t).toFixed(1)}s`, r.left + 18, r.top + 20, RED, { boxed: false });
-  }
-
-  get active(): boolean {
-    return this.t < this.seconds;
-  }
-
-  /** Lights back on (fades out now). */
-  end(): void {
-    this.t = Math.max(this.t, this.seconds);
-  }
-}
-
-/** One blackout at a time per race (stage). */
-const blackouts = new WeakMap<Stage, Blackout>();
-
-export async function blackout(ctx: AttackContext): Promise<boolean> {
-  if (blackouts.get(ctx.stage)?.active) return false;
-  const dark = new Blackout(ctx, ctx.difficulty.blackoutSeconds);
-  blackouts.set(ctx.stage, dark);
-  ctx.stage.add(dark);
-  ctx.actor.status = 'lights.off()';
-  ctx.stage.shake(2);
-  ctx.say('blackout');
-  await ctx.stage.wait(0.2);
-  return true;
-}
-
-export function blackoutActive(stage: Stage): boolean {
-  return blackouts.get(stage)?.active ?? false;
-}
-
-export function endBlackout(stage: Stage): void {
-  blackouts.get(stage)?.end();
 }
 
 // ---------------------------------------------------------- harassment

@@ -404,18 +404,27 @@ export class SpiderActor implements Drawable {
 
   // --------------------------------------------------------------- damage
 
-  /** Destroys a word of the current pane and counts it. */
-  destroyWord(word: Word, kind: 'eaten' | 'hole' | 'squashed' = 'eaten'): void {
+  /** Destroys a word (of the current pane by default) and counts it. */
+  destroyWord(word: Word, kind: 'eaten' | 'hole' | 'squashed' | 'burned' = 'eaten', pane: RacerPane | null = this.surface): void {
     if (word.gone) return;
     word.gone = true;
     word.el.classList.add(kind === 'eaten' ? EATEN_CLASS : `sw-${kind}`);
-    const pane = this.surface;
-    if (word.link && pane) pane.damageLink(word.link, 'eaten');
+    if (word.link && pane) pane.damageLink(word.link, kind === 'burned' ? 'burned' : 'eaten');
     this.wordsEaten++;
     this.onEat?.(this.wordsEaten);
     if (kind === 'eaten' && pane) {
       this.fragments.burst(pane.toStage(center(word.box)), { count: 4, colors: [RED, LINE], speed: [12, 46], life: [0.2, 0.32], gravity: 30 });
     }
+  }
+
+  /**
+   * Burns a word of either pane (fan laser): charred for good, and its link
+   * with it. The link the spider is heading for is spared.
+   */
+  burnWord(pane: RacerPane, word: Word): boolean {
+    if (word.gone || (pane === this.surface && this.protectedLink && word.link === this.protectedLink)) return false;
+    this.destroyWord(word, 'burned', pane);
+    return true;
   }
 
   /** Eats every word under the body: it leaves a swath of destroyed text behind. */

@@ -21,7 +21,8 @@ function result(race: Race, difficulty: DifficultyId, extra: Partial<RaceResult>
     wordsEaten: 2318,
     spiderOneAway: false,
     gaveUp: false,
-    photoFinish: false,
+    decoysClicked: 0,
+    snatched: false,
     hardWins: 0,
     ...extra,
   };
@@ -66,7 +67,7 @@ describe('Race', () => {
     advance(3000);
     expect(race.move('spider', 'Tidewatch Observatory', 'link', 'target')).toBe(true);
     expect(race.winner).toBe('spider');
-    expect(race.spider.finishedAt).toBe(6000);
+    expect(race.spider.arrivedAt).toBe(6000);
     expect(race.spider.path[1].note).toBe('semantic');
     // The player can still finish, but does not take the win.
     advance(2000);
@@ -105,54 +106,6 @@ describe('Race', () => {
   });
 });
 
-describe('penalties and photo finish', () => {
-  it('adds penalties to the official time', () => {
-    const { race, advance } = setup();
-    race.penalize('player', 15_000);
-    advance(10_000);
-    expect(race.move('player', 'Tidewatch Observatory')).toBe(true);
-    expect(race.player.arrivedAt).toBe(10_000);
-    expect(race.player.finishedAt).toBe(25_000);
-    // Photo finish: the spider can still win.
-    expect(race.winner).toBeNull();
-    expect(race.photoFinish).toEqual({ who: 'player', until: 25_000 });
-    advance(14_000);
-    expect(race.settle()).toBeNull();
-    advance(1_000);
-    expect(race.settle()).toBe('player');
-    expect(race.photoFinish).toBeNull();
-  });
-
-  it('lets the spider win a photo finish by arriving first', () => {
-    const { race, advance } = setup();
-    race.penalize('player', 15_000);
-    advance(10_000);
-    race.move('player', 'Tidewatch Observatory');
-    advance(4_000);
-    expect(race.move('spider', 'Tidewatch Observatory')).toBe(true);
-    expect(race.winner).toBe('spider');
-  });
-
-  it('decides a photo finish at once when the spider retires', () => {
-    const { race, advance } = setup();
-    race.penalize('player', 15_000);
-    advance(1_000);
-    race.move('player', 'Tidewatch Observatory');
-    expect(race.winner).toBeNull();
-    race.retire('spider');
-    expect(race.winner).toBe('player');
-  });
-
-  it('ignores penalties after arrival', () => {
-    const { race, advance } = setup();
-    advance(1_000);
-    race.move('player', 'Tidewatch Observatory');
-    race.penalize('player', 15_000);
-    expect(race.player.finishedAt).toBe(1_000);
-    expect(race.winner).toBe('player');
-  });
-});
-
 describe('finish screen verdict', () => {
   it('describes a win with the hop margin', () => {
     const { race, advance } = setup();
@@ -183,15 +136,12 @@ describe('finish screen verdict', () => {
     expect(verdict.detail).toBe('The spider ate 2,318 words and your dignity.');
   });
 
-  it('blames the penalty after a lost photo finish', () => {
-    const { race, advance } = setup();
-    race.penalize('player', 15_000);
-    advance(1_000);
-    race.move('player', 'Tidewatch Observatory');
-    advance(2_000);
+  it('teases a player who fell for a fake link or got robbed', () => {
+    const { race } = setup();
     race.move('spider', 'Tidewatch Observatory');
-    const verdict = outcome(result(race, 'hard', { photoFinish: true }), () => 0.5);
-    expect(verdict.detail).toBe('Photo finish. The +15 s penalty did you in.');
+    const lines = new Set(Array.from({ length: 40 }, (_, i) => outcome(result(race, 'hard', { decoysClicked: 1, snatched: true }), () => i / 40).detail));
+    expect(lines).toContain('You clicked a fake link. The babies say thanks.');
+    expect(lines).toContain('It stole your best link. And your race.');
   });
 
   it('handles giving up and nobody finishing', () => {
