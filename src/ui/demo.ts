@@ -90,10 +90,10 @@ export class TitleDemo {
       return { left: t.left - r.left, top: t.top - r.top, right: t.right - r.left, bottom: t.bottom - r.top };
     };
     const ground = {
-      hold: (desired: Point, accept?: (p: Point) => boolean): Foothold => {
+      hold: (desired: Point, accept?: (p: Point) => boolean): Foothold | null => {
         const on = (b: Box) => ({ x: Math.min(Math.max(desired.x, b.left + 3), b.right - 3), y: b.top + (b.bottom - b.top) * 0.62 });
-        const word = words.nearest(desired, rig.reach * 0.3, (w) => !w.gone && (!accept || accept(on(w.box))));
-        return word ? { point: on(word.box), word } : { point: desired, word: null };
+        const word = words.nearest(desired, rig.reach * 0.5, (w) => !w.gone && (!accept || accept(on(w.box))));
+        return word ? { point: on(word.box), word } : null;
       },
     };
     let rays: Array<{ to: Point; age: number }> = [];

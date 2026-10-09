@@ -271,7 +271,7 @@ function howItWorks(): HTMLElement {
       { class: 'how-grid' },
       step('laser', '', 'eye laser', 'Fires from the red eye to lock the next link, and slices words in half on the way. Sparks at the cut.'),
       step('throw', '', 'grab & throw', 'A front leg plucks a word out of the text and flings it off the page, spinning. It leaves a dashed hole behind.'),
-      step('stomp', '', 'stomp', 'Slams a foot onto a short word: impact rings, a small screen shake, and the word squashes flat.'),
+      step('stomp', '', 'stomp', 'Slams a foot onto a short word: impact rings, a small screen shake, and the word cracks and falls apart.'),
       step('zip', '', 'web zip', 'Only when the best link is very far down the page: it shoots a silk line at it and zips there in one move. Otherwise it goes on foot.'),
     ),
     h('header', { class: 'how-head' }, h('h2', { text: 'Difficulty' }), h('p', { text: 'same brain on every level · only its manners change' })),

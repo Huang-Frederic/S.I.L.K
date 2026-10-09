@@ -349,14 +349,11 @@ ul.wiki-plainlist {
   }
 }
 
-/* Stomped: squashed flat. */
-.sw-squashed {
-  display: inline-block;
-  color: #ff2b3a !important;
-  opacity: 0.6;
-  transform: scale(1.22, 0.28);
-  transform-origin: 50% 85%;
-  text-decoration: none !important;
+/* Crushed: the word cracked and its pieces fell off the line; a faint dotted trace remains. */
+.sw-crumbled {
+  color: transparent !important;
+  text-decoration: underline dotted rgba(240, 244, 248, 0.28) !important;
+  text-underline-offset: 3px;
 }
 
 /* ------------------------------------------------------------------------
