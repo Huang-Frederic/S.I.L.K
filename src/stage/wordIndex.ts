@@ -8,7 +8,6 @@ import type { Box, Point } from './stage';
 
 export const WORD_CLASS = 'sw';
 export const EATEN_CLASS = 'sw-eaten';
-export const GONE_CLASS = 'sw-gone';
 
 const TEXT_BLOCKS = 'p, li, dd, dt, td, th, caption, blockquote, pre, h1, h2, h3, h4, h5, h6, .wiki-hatnote, .wiki-subtitle';
 

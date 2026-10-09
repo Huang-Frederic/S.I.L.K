@@ -27,7 +27,7 @@ import { Z, type Box, type Drawable, type Point, type Stage } from '../stage/sta
 import { EATEN_CLASS, type Word } from '../stage/wordIndex';
 import type { LoadedArticle } from '../wiki/articles';
 import { OPEN_GROUND, SpiderRig, type Foothold, type Ground } from './rig';
-import { planWalk } from './route';
+import { cameraTarget, planWalk, wordsAroundLink } from './route';
 
 export class Interrupted extends Error {
   constructor(readonly reason: string) {
@@ -263,7 +263,7 @@ export class SpiderActor implements Drawable {
     const max = sc.scrollHeight - sc.clientHeight;
     if (max <= 0) return;
     if (Math.abs(this.camY - sc.scrollTop) > 2) this.camY = sc.scrollTop;
-    const target = clamp(this.rig.y - sc.clientHeight * 0.42, 0, max);
+    const target = cameraTarget(this.rig.y, sc.clientHeight, sc.scrollHeight);
     this.camY += (target - this.camY) * (1 - Math.exp(-dt * (this.zipLine ? 12 : 4.5)));
     const rounded = Math.round(this.camY);
     if (rounded !== sc.scrollTop) sc.scrollTop = rounded;
@@ -584,13 +584,15 @@ export class SpiderActor implements Drawable {
     if (!pane) return;
     const box = pane.linkBox(anchor);
     pane.words.ensure({ left: box.left - 600, right: box.right + 600, top: box.top - 40, bottom: box.bottom + 40 });
-    const tolerance = Math.max(6, (box.bottom - box.top) * 0.5);
-    const line = pane.words
-      .inside({ left: -1e6, right: 1e6, top: (box.top + box.bottom) / 2 - tolerance, bottom: (box.top + box.bottom) / 2 + tolerance }, (w) => !w.gone && w.link !== anchor)
-      .map((w) => w.box);
-    const before = line.filter((b) => b.right <= box.left + 1).sort((a, b) => a.left - b.left);
-    const after = line.filter((b) => b.left >= box.right - 1).sort((a, b) => a.left - b.left);
-    const plan = planWalk(box, before, after, 15, 5);
+    const near = pane.words.inside({ left: -1e6, right: 1e6, top: box.top - 30, bottom: box.bottom + 30 }, (w) => !w.gone && w.link !== anchor).map((w) => w.box);
+    const { before, after } = wordsAroundLink(box, near);
+    const plan = planWalk(
+      box,
+      before.map((i) => near[i]),
+      after.map((i) => near[i]),
+      15,
+      5,
+    );
     const here = { x: this.rig.x, y: this.rig.y };
     const onLine = Math.abs(here.y - plan.start.y) < 6 && (plan.direction === 1 ? here.x >= plan.start.x - 4 && here.x <= plan.end.x : here.x <= plan.start.x + 4 && here.x >= plan.end.x);
     if (!onLine) {

@@ -65,11 +65,6 @@ export function planWalk(link: Box, before: readonly Box[], after: readonly Box[
   };
 }
 
-/** True when going from `a` to `b` means leaving the current line (abseil on silk). */
-export function crossesLines(a: Point, b: Point, lineHeight: number): boolean {
-  return Math.abs(b.y - a.y) > lineHeight * 0.75;
-}
-
 /** Splits words into those on the link's line, left and right of it. */
 export function wordsAroundLink(link: Box, words: readonly Box[]): { before: number[]; after: number[] } {
   const y = centerY(link);
