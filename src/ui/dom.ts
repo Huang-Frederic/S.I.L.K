@@ -1,4 +1,7 @@
 /** Tiny DOM helpers so that UI code can stay framework-free but readable. */
+import { t } from '../i18n';
+import { ArticleNotFoundError } from '../wiki/client';
+import { HttpError, NetworkError } from '../wiki/http';
 
 export type Child = Node | string | number | null | undefined | false;
 
@@ -45,6 +48,10 @@ export function formatClock(ms: number): string {
 
 /** Human readable message for any thrown value. */
 export function errorMessage(error: unknown): string {
+  const text = t().errors;
+  if (error instanceof ArticleNotFoundError) return text.missing(error.title);
+  if (error instanceof HttpError) return text.http(error.status);
+  if (error instanceof NetworkError) return text.network;
   if (error instanceof Error) return error.message;
   return String(error);
 }

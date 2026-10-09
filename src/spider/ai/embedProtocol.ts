@@ -1,6 +1,7 @@
 /** Messages exchanged with the embedding worker. */
+import type { Lang } from '../../i18n';
 
-export type EmbedRequest = { type: 'load' } | { type: 'embed'; id: number; texts: string[] };
+export type EmbedRequest = { type: 'load'; model: string } | { type: 'embed'; id: number; texts: string[] };
 
 export type EmbedResponse =
   | { type: 'progress'; fraction: number }
@@ -9,8 +10,16 @@ export type EmbedResponse =
   | { type: 'embedded'; id: number; data: Float32Array; dim: number }
   | { type: 'embed-error'; id: number; message: string };
 
-/** Sentence-embedding model used by the spider (384 dimensions, ~23 MB quantized). */
-export const MODEL_ID = 'Xenova/all-MiniLM-L6-v2';
+/**
+ * Sentence-embedding model used by the spider, per language (384 dimensions
+ * each): English MiniLM (~23 MB quantized), and its multilingual cousin for
+ * French (~118 MB, fetched once and then cached by the browser), which
+ * ranks French titles far better than the English one does.
+ */
+export const MODEL_IDS: Record<Lang, string> = {
+  en: 'Xenova/all-MiniLM-L6-v2',
+  fr: 'Xenova/paraphrase-multilingual-MiniLM-L12-v2',
+};
 
 /**
  * transformers.js, pinned. The self-contained build (ONNX runtime included) is

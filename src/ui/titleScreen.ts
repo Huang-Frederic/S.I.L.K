@@ -2,11 +2,13 @@
  * Title screen (mockup "Title screen"): the pitch, the race form (start and
  * target pages with autocomplete and dice, difficulty), a live demo of the
  * spider, settings (Reduce motion) and the local Hard-mode win counter, then
- * "How it works" below the fold.
+ * "How it works" below the fold. The language picker (French or English:
+ * the texts and the Wikipedia the race runs on) sits in the top bar.
  */
 import { GAME_FULL_NAME, REPO_URL } from '../config';
 import { DIFFICULTIES, type DifficultyId } from '../game/difficulty';
 import { pickRandomStart, pickRandomTarget, validatePair, type ValidatedPair } from '../game/pairs';
+import { lang, LANGS, t, type Lang } from '../i18n';
 import { settings } from '../settings';
 import type { WikiClient } from '../wiki/client';
 import { Autocomplete } from './autocomplete';
@@ -27,6 +29,8 @@ export interface TitleScreenOptions {
   initialTarget?: string;
   initialDifficulty: DifficultyId;
   onStart: (choice: TitleChoice) => void;
+  /** The player picked another language: the screen is rebuilt in it. */
+  onLanguage: (lang: Lang) => void;
 }
 
 export interface TitleScreen {
@@ -38,38 +42,39 @@ export interface TitleScreen {
 
 export function createTitleScreen(options: TitleScreenOptions): TitleScreen {
   const { client } = options;
-  const startField = titleField('start', 'Start page', 'e.g. Silk', client);
-  const targetField = titleField('target', 'Target page', 'e.g. Pixel art', client);
+  const text = t().title;
+  const startField = titleField('start', text.start, client);
+  const targetField = titleField('target', text.target, client);
   startField.input.value = options.initialStart ?? '';
   targetField.input.value = options.initialTarget ?? '';
 
   const difficulty = difficultyPicker(options.initialDifficulty);
   const generalError = h('p', { class: 'field-error', attrs: { role: 'alert' } });
   generalError.hidden = true;
-  const startBtn = h('button', { class: 'btn btn-primary btn-start', text: 'Start race', attrs: { type: 'submit' } });
-  const randomPairBtn = h('button', { class: 'btn btn-ghost btn-random', attrs: { type: 'button' } }, icon('dice', 18), 'Random pair');
+  const startBtn = h('button', { class: 'btn btn-primary btn-start', text: text.startRace, attrs: { type: 'submit' } });
+  const randomPairBtn = h('button', { class: 'btn btn-ghost btn-random', attrs: { type: 'button' } }, icon('dice', 18), text.randomPair);
 
   const setBusy = (busy: boolean) => {
     for (const el of [randomPairBtn, startBtn, startField.dice, targetField.dice]) el.disabled = busy;
-    startBtn.textContent = busy ? 'Checking…' : 'Start race';
+    startBtn.textContent = busy ? text.checking : text.startRace;
   };
 
   const rollStart = async () => {
     startField.dice.disabled = true;
     startField.input.value = '';
-    startField.input.placeholder = 'Rolling a random article…';
+    startField.input.placeholder = text.rolling;
     try {
       startField.input.value = await pickRandomStart(client, [targetField.input.value]);
       startField.setError();
     } catch {
-      startField.setError('Could not reach Wikipedia for a random article. Type one instead.');
+      startField.setError(text.randomFailed);
     } finally {
       startField.dice.disabled = false;
-      startField.input.placeholder = 'e.g. Silk';
+      startField.input.placeholder = text.start.placeholder;
     }
   };
   const rollTarget = () => {
-    targetField.input.value = pickRandomTarget([startField.input.value]);
+    targetField.input.value = pickRandomTarget(lang(), [startField.input.value]);
     targetField.setError();
   };
   startField.dice.addEventListener('click', () => void rollStart());
@@ -122,11 +127,12 @@ export function createTitleScreen(options: TitleScreenOptions): TitleScreen {
     h(
       'nav',
       { class: 'title-nav' },
-      h('span', { class: 'title-version' }, 'S.I.L.K ', h('span', { text: '/ v0.2' })),
+      h('span', { class: 'title-version' }, 'S.I.L.K ', h('span', { text: '/ v0.3' })),
       h(
         'div',
         { class: 'title-links' },
-        h('a', { text: 'How it works', attrs: { href: '#how' } }),
+        languagePicker(options.onLanguage),
+        h('a', { text: text.howLink, attrs: { href: '#how' } }),
         h('a', { text: 'GitHub', attrs: { href: REPO_URL, target: '_blank', rel: 'noopener noreferrer' } }),
       ),
     ),
@@ -140,14 +146,11 @@ export function createTitleScreen(options: TitleScreenOptions): TitleScreen {
         h(
           'div',
           { class: 'hero-title' },
-          h('p', { class: 'kicker', text: 'Wikirace // you vs. a crawling spider' }),
+          h('p', { class: 'kicker', text: text.kicker }),
           h('h1', { class: 'hero-logo' }, logoMark('logo-big')),
           h('p', { class: 'hero-sub', text: GAME_FULL_NAME }),
         ),
-        h(
-          'p',
-          { class: 'hero-pitch', text: 'Pick two Wikipedia pages. Click your way from one to the other while an AI spider crawls the same web, smashing words and diving into links. First one there wins.' },
-        ),
+        h('p', { class: 'hero-pitch', text: text.pitch }),
       ),
       // Row 2: play, and watch the spider. Same height, same edges.
       h('div', { class: 'hero-play' }, form, demo.element),
@@ -155,12 +158,12 @@ export function createTitleScreen(options: TitleScreenOptions): TitleScreen {
       h(
         'footer',
         { class: 'title-foot' },
-        h('p', { text: 'Article text from Wikipedia, CC BY-SA 4.0. Not affiliated with the Wikimedia Foundation.' }),
+        h('p', { text: text.foot }),
         h(
           'div',
           { class: 'title-settings' },
-          h('label', { class: 'toggle', attrs: { for: 'reduce-motion' } }, reduce, h('span', { class: 'toggle-ui', attrs: { 'aria-hidden': 'true' } }), 'Reduce motion'),
-          h('span', { class: 'hard-wins', attrs: { title: 'Counted in this browser only' } }, 'Hard mode wins: ', h('strong', { text: String(wins) })),
+          h('label', { class: 'toggle', attrs: { for: 'reduce-motion' } }, reduce, h('span', { class: 'toggle-ui', attrs: { 'aria-hidden': 'true' } }), text.reduceMotion),
+          h('span', { class: 'hard-wins', attrs: { title: text.hardWinsHint } }, text.hardWins, h('strong', { text: String(wins) })),
         ),
       ),
     ),
@@ -182,12 +185,13 @@ interface TitleField {
   setError: (message?: string) => void;
 }
 
-function titleField(id: string, label: string, placeholder: string, client: WikiClient): TitleField {
+function titleField(id: string, text: { label: string; placeholder: string; dice: string }, client: WikiClient): TitleField {
+  const { label, placeholder } = text;
   const inputId = `field-${id}`;
-  const input = h('input', { class: 'input', attrs: { id: inputId, name: id, type: 'text', placeholder } });
+  const input = h('input', { class: 'input', attrs: { id: inputId, name: id, type: 'text', placeholder, lang: t().htmlLang } });
   const dice = h('button', {
     class: 'btn btn-icon',
-    attrs: { type: 'button', title: `Random ${label.toLowerCase()}`, 'aria-label': `Random ${label.toLowerCase()}` },
+    attrs: { type: 'button', title: text.dice, 'aria-label': text.dice },
   });
   dice.append(icon('dice', 20));
   const error = h('p', { class: 'field-error', attrs: { id: `${inputId}-error` } });
@@ -221,31 +225,50 @@ function titleField(id: string, label: string, placeholder: string, client: Wiki
 
 /** Easy / Normal / Hard as a radio group styled as a segmented control. */
 function difficultyPicker(initial: DifficultyId): { element: HTMLElement; value: () => DifficultyId } {
+  const levels = t().difficulties;
   const blurb = h('p', { class: 'difficulty-blurb', attrs: { 'aria-live': 'polite' } });
   const radios = Object.values(DIFFICULTIES).map((d) => {
     const input = h('input', { attrs: { type: 'radio', name: 'difficulty', value: d.id, id: `difficulty-${d.id}` } });
     input.checked = d.id === initial;
-    input.addEventListener('change', () => (blurb.textContent = d.blurb));
+    input.addEventListener('change', () => (blurb.textContent = levels[d.id].blurb));
     return { d, input };
   });
-  blurb.textContent = DIFFICULTIES[initial].blurb;
+  blurb.textContent = levels[initial].blurb;
   const element = h(
     'fieldset',
     { class: 'difficulty' },
-    h('legend', { class: 'field-label', text: 'Spider difficulty' }),
+    h('legend', { class: 'field-label', text: t().title.difficulty }),
     h(
       'div',
       { class: 'difficulty-options' },
-      ...radios.map(({ d, input }) => h('label', { class: `difficulty-option is-${d.id}`, attrs: { for: input.id } }, input, h('span', { text: d.label }))),
+      ...radios.map(({ d, input }) => h('label', { class: `difficulty-option is-${d.id}`, attrs: { for: input.id } }, input, h('span', { text: levels[d.id].label }))),
     ),
     blurb,
   );
   return { element, value: () => radios.find((r) => r.input.checked)?.d.id ?? initial };
 }
 
+/** FR / EN: the texts, and the Wikipedia the race is run on. */
+function languagePicker(onPick: (lang: Lang) => void): HTMLElement {
+  return h(
+    'div',
+    { class: 'lang-picker', attrs: { role: 'group', 'aria-label': t().title.language } },
+    ...LANGS.map((code) =>
+      h('button', {
+        class: `lang-option ${code === lang() ? 'is-active' : ''}`,
+        text: t(code).short,
+        attrs: { type: 'button', lang: t(code).htmlLang, title: t(code).name, 'aria-pressed': String(code === lang()) },
+        on: { click: () => code !== lang() && onPick(code) },
+      }),
+    ),
+  );
+}
+
 /** "How it works": the hop cycle, the move set, the difficulty levels. */
 function howItWorks(): HTMLElement {
-  const step = (kind: IllustrationKind, number: string, title: string, text: string) =>
+  const how = t().how;
+  const levels = t().difficulties;
+  const step = (kind: IllustrationKind, number: string, [title, text]: string[]) =>
     h(
       'article',
       { class: 'how-card' },
@@ -256,41 +279,31 @@ function howItWorks(): HTMLElement {
   return h(
     'section',
     { class: 'how', attrs: { id: 'how' } },
-    h('header', { class: 'how-head' }, h('h2', { text: 'How the spider crawls' }), h('p', { text: 'one hop = scan → crawl & eat → grab → hop · loops until target' })),
+    h('header', { class: 'how-head' }, h('h2', { text: how.crawl.title }), h('p', { text: how.crawl.sub })),
     h(
       'div',
       { class: 'how-grid' },
-      step('scan', '01', 'scan', 'Lands on a page and fires a ray at every link to score it: direct hit, links back to the target, or closest in meaning.'),
-      step('crawl', '02', 'crawl & eat', 'Weaves over the real text toward the link like a snake. Each foot grabs a word (cyan box); words under its jaws get struck out and break apart.'),
-      step('grab', '03', 'grab', 'Reaches the link and wraps all eight legs around it. The link lights up and the page edges start to glitch.'),
-      step('hop', '04', 'hop', 'The old page glitches out in RGB-split slices, the next article loads, and the spider drops in on its silk thread.'),
+      step('scan', '01', how.steps.scan),
+      step('crawl', '02', how.steps.crawl),
+      step('grab', '03', how.steps.grab),
+      step('hop', '04', how.steps.hop),
     ),
-    h('header', { class: 'how-head' }, h('h2', { text: 'Spider move set' }), h('p', { text: 'simple body, flashy moves · triggered at random while it crawls' })),
+    h('header', { class: 'how-head' }, h('h2', { text: how.moves.title }), h('p', { text: how.moves.sub })),
     h(
       'div',
       { class: 'how-grid' },
-      step('laser', '', 'eye laser', 'Fires from the red eye to lock the next link, and slices words in half on the way. Sparks at the cut.'),
-      step('throw', '', 'grab & throw', 'A front leg plucks a word out of the text and flings it off the page, spinning. It leaves a dashed hole behind.'),
-      step('stomp', '', 'stomp', 'Slams a foot onto a short word: impact rings, a small screen shake, and the word cracks and falls apart.'),
-      step('zip', '', 'web zip', 'Now and then, for a link a few lines away, it shoots a silk line at it and zips there in one move. A long way, it goes on foot, bounding forward every so often.'),
+      step('laser', '', how.moveCards.laser),
+      step('throw', '', how.moveCards.throw),
+      step('stomp', '', how.moveCards.stomp),
+      step('zip', '', how.moveCards.zip),
     ),
-    h('header', { class: 'how-head' }, h('h2', { text: 'Difficulty' }), h('p', { text: 'same brain on every level · only its manners change' })),
+    h('header', { class: 'how-head' }, h('h2', { text: how.levels.title }), h('p', { text: how.levels.sub })),
     h(
       'div',
       { class: 'how-levels' },
-      level('Easy', 'is-easy', ['Slow thinker.', 'Only crawls and tears up its own page.', 'Never attacks you.', 'Winnable.']),
-      level('Normal', 'is-normal', [
-        'The default. It runs.',
-        'Web traps, a fan laser that burns every word it sweeps, word bombardments.',
-        'About one attack every 25 s, faster in rage (when your page links to the target).',
-        'Hard but winnable.',
-      ]),
-      level('Hard', 'is-hard', [
-        'Tears the page apart as it goes, and fumbles a little for the right link; rage always on.',
-        'An attack every 4–8 s, chained, no warning: webs, fan lasers, word bombs, fake target links full of mini-spiders, and now and then a silk line on your cursor.',
-        'Get ahead and it steals the good link you click (never your first three, never the last two before the target, at most one a minute): it leaps across, eats it, dives in, and the panes swap.',
-        'Expected win rate: almost zero.',
-      ]),
+      level(levels.easy.label, 'is-easy', how.levelLines.easy),
+      level(levels.normal.label, 'is-normal', how.levelLines.normal),
+      level(levels.hard.label, 'is-hard', how.levelLines.hard),
     ),
   );
 }

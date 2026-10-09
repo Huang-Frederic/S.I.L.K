@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { RaceClock } from '../src/game/clock';
 import { DIFFICULTIES, type DifficultyId } from '../src/game/difficulty';
 import { Race } from '../src/game/race';
+import { setLang } from '../src/i18n';
 import { outcome, pathsText } from '../src/ui/finishScreen';
 import type { RaceResult } from '../src/ui/raceScreen';
 
@@ -107,6 +108,8 @@ describe('Race', () => {
 });
 
 describe('finish screen verdict', () => {
+  beforeEach(() => setLang('en'));
+
   it('describes a win with the hop margin', () => {
     const { race, advance } = setup();
     for (const title of ['A', 'B', 'C', 'D', 'E', 'F', 'G']) race.move('spider', title);
@@ -160,5 +163,20 @@ describe('finish screen verdict', () => {
     expect(text).toContain('S.I.L.K · Moth Orchard → Tidewatch Observatory · Normal');
     expect(text).toContain('You (1 hop, 01:05): Moth Orchard → Tidewatch Observatory');
     expect(text).toContain('Spider (0 hops): Moth Orchard');
+  });
+
+  it('says it all in French in French', () => {
+    setLang('fr');
+    const { race, advance } = setup();
+    for (const title of ['A', 'B', 'C']) race.move('spider', title);
+    advance(65_000);
+    race.move('player', 'Tidewatch Observatory');
+    const verdict = outcome(result(race, 'normal'));
+    expect(verdict).toMatchObject({ kind: 'win', title: 'Tu as gagné.', status: 'spider.status = vaincue' });
+    expect(verdict.detail).toBe('Tu bats l’araignée de 2 sauts. Elle rampait encore.');
+    const text = pathsText(result(race, 'normal'), verdict);
+    expect(text).toContain('Toi (1 saut, 01:05): Moth Orchard → Tidewatch Observatory');
+    expect(text).toContain('Araignée (3 sauts)');
+    expect(outcome(result(race, 'hard', { hardWins: 2 })).tagline).toBe('(fais une capture.)');
   });
 });

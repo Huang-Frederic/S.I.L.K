@@ -6,16 +6,11 @@
  * again (the words grow back after a while).
  */
 import { CYAN, drawLaser, Fragments, LINE, RED, strokeBox } from '../fx/fx';
+import { t } from '../i18n';
 import { SpiderRig, type Foothold } from '../spider/rig';
 import { Stage, StageClosedError, Z, type Box, type Point } from '../stage/stage';
 import { EATEN_CLASS, WordIndex, type Word } from '../stage/wordIndex';
 import { h } from './dom';
-
-const TEXT: Array<string | { strong: string }> = [
-  'A ',
-  { strong: 'web crawler' },
-  ' is a program that visits a page, reads its links and follows them, one hop at a time. Search engines use crawlers to map the web, archives use them to keep it, and this one uses them to beat you. It reads every link on the page, picks the one closest to the target, and crawls straight to it.',
-];
 
 const center = (b: Box): Point => ({ x: (b.left + b.right) / 2, y: (b.top + b.bottom) / 2 });
 
@@ -29,10 +24,11 @@ export class TitleDemo {
   private readonly hud: Record<'state' | 'links' | 'match', HTMLElement>;
 
   constructor() {
-    this.text = h('p', { class: 'demo-text' }, ...TEXT.map((part) => (typeof part === 'string' ? part : h('strong', { text: part.strong }))));
+    const demo = t().demo;
+    this.text = h('p', { class: 'demo-text', attrs: { lang: t().htmlLang } }, ...demo.text.map((part) => (typeof part === 'string' ? part : h('strong', { text: part.strong }))));
     const stat = (key: string, value: HTMLElement) => h('span', { class: 'demo-stat' }, h('span', { class: 'demo-key', text: key }), ' = ', value);
     this.hud = {
-      state: h('span', { class: 'demo-state', text: 'BOOTING' }),
+      state: h('span', { class: 'demo-state', text: demo.states.boot }),
       links: h('span', { class: 'demo-value', text: '0' }),
       match: h('span', { class: 'demo-value', text: '0.00' }),
     };
@@ -43,7 +39,7 @@ export class TitleDemo {
       h(
         'figcaption',
         { class: 'demo-bar' },
-        h('span', { class: 'demo-live', text: 'live · crawler.demo' }),
+        h('span', { class: 'demo-live', text: demo.live }),
         h('span', { class: 'demo-hud' }, stat('crawler.state', this.hud.state), stat('links_found', this.hud.links), stat('best_match', this.hud.match)),
       ),
       this.body,
@@ -144,7 +140,7 @@ export class TitleDemo {
         rig.plantAll(ground);
       }
       // 01 scan
-      this.hud.state.textContent = 'SCANNING';
+      this.hud.state.textContent = t().demo.states.scan;
       this.hud.state.className = 'demo-state is-scan';
       const candidates = words.all().filter((w) => !w.gone && (w.el.textContent?.length ?? 0) >= 4);
       let found = 0;
@@ -172,12 +168,12 @@ export class TitleDemo {
       laser = 0.45;
       rig.lookAt = center(target.box);
       rig.face({ x: center(target.box).x - rig.x, y: center(target.box).y - rig.y });
-      this.hud.state.textContent = 'LOCKED';
+      this.hud.state.textContent = t().demo.states.lock;
       this.hud.state.className = 'demo-state is-lock';
       await stage.wait(0.6);
 
       // 02 crawl
-      this.hud.state.textContent = 'CRAWLING';
+      this.hud.state.textContent = t().demo.states.crawl;
       this.hud.state.className = 'demo-state is-crawl';
       const goal = { x: center(target.box).x - 4, y: center(target.box).y };
       let speed = 0;
@@ -195,7 +191,7 @@ export class TitleDemo {
       }
 
       // Eat.
-      this.hud.state.textContent = 'EATING';
+      this.hud.state.textContent = t().demo.states.eat;
       this.hud.state.className = 'demo-state is-eat';
       target.gone = true;
       target.el.classList.add(EATEN_CLASS);

@@ -6,8 +6,9 @@
  * spider on Hard earns a big "IMPOSSIBLE. (screenshot this.)".
  */
 import { REPO_URL, GAME_URL } from '../config';
-import { GIVE_UP_ROASTS, pickRoast } from '../game/comedy';
+import { giveUpRoasts, pickRoast } from '../game/comedy';
 import type { PathStep, Race } from '../game/race';
+import { lang, t } from '../i18n';
 import { OPEN_GROUND, SpiderRig } from '../spider/rig';
 import { wikipediaUrl } from '../wiki/titles';
 import { formatClock, h } from './dom';
@@ -25,51 +26,52 @@ export interface Outcome {
   status: string;
 }
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-
 /** What happened, in words. `random` picks the roast line. */
 export function outcome(result: RaceResult, random: () => number = Math.random): Outcome {
   const { race, difficulty } = result;
   const { player, spider } = race;
+  const text = t().finish;
+  const status = (kind: OutcomeKind) => `spider.status = ${text.status[kind]}`;
   if (race.winner === 'player') {
     const diff = spider.hops - player.hops;
-    const margin =
-      diff > 0 ? `You beat the spider by ${plural(diff, 'hop')}.` : diff === 0 ? 'You beat the spider in as many hops.' : `You beat the spider, even with ${plural(-diff, 'more hop')}.`;
-    const spiderNote = spider.retired ? ' The spider gave up.' : result.spiderOneAway ? ' It was one link away from the target.' : ' It was still crawling.';
+    const margin = diff > 0 ? text.beatBy(diff) : diff === 0 ? text.beatEven : text.beatDespite(-diff);
+    const spiderNote = spider.retired ? text.spiderRetired : result.spiderOneAway ? text.spiderOneAway : text.spiderCrawling;
     if (difficulty.id === 'hard') {
       return {
         kind: 'impossible',
-        title: 'IMPOSSIBLE.',
-        tagline: '(screenshot this.)',
-        detail: `${margin}${spiderNote} Hard mode wins in this browser: ${result.hardWins}.`,
-        status: 'spider.status = deceased',
+        title: text.impossible,
+        tagline: text.screenshot,
+        detail: `${margin}${spiderNote}${text.hardWins(result.hardWins)}`,
+        status: status('impossible'),
       };
     }
-    return { kind: 'win', title: 'You win.', detail: `${margin}${spiderNote}`, status: 'spider.status = defeated' };
+    return { kind: 'win', title: text.win, detail: `${margin}${spiderNote}`, status: status('win') };
   }
   if (result.gaveUp) {
-    return { kind: 'gave-up', title: 'You gave up.', detail: GIVE_UP_ROASTS[Math.floor(random() * GIVE_UP_ROASTS.length)], status: 'spider.status = smug' };
+    const lines = giveUpRoasts();
+    return { kind: 'gave-up', title: text.gaveUp, detail: lines[Math.floor(random() * lines.length)], status: status('gave-up') };
   }
   if (race.winner === 'spider') {
     const roast = pickRoast(
       { wordsEaten: result.wordsEaten, spiderHops: spider.hops, difficulty: difficulty.id, decoysClicked: result.decoysClicked, snatched: result.snatched },
       random,
     );
-    return { kind: 'lose', title: 'Spider wins.', detail: roast, status: 'spider.status = victorious' };
+    return { kind: 'lose', title: text.lose, detail: roast, status: status('lose') };
   }
-  return { kind: 'nobody', title: 'Nobody made it.', detail: 'Both of you gave up on this one.', status: 'spider.status = stuck' };
+  return { kind: 'nobody', title: text.nobody, detail: text.nobodyDetail, status: status('nobody') };
 }
 
 /** Plain-text summary of both paths (Copy both paths). */
 export function pathsText(result: RaceResult, verdict: Outcome): string {
   const { race } = result;
+  const text = t().finish;
   const line = (who: string, state: Race['player']) =>
-    `${who} (${plural(state.hops, 'hop')}${state.arrivedAt !== null ? `, ${formatClock(state.arrivedAt)}` : ''}): ${state.path.map((s) => (s.via === 'swap' ? `[swap] ${s.title}` : s.title)).join(' → ')}`;
+    `${who} (${text.hops(state.hops)}${state.arrivedAt !== null ? `, ${formatClock(state.arrivedAt)}` : ''}): ${state.path.map((s) => (s.via === 'swap' ? `[swap] ${s.title}` : s.title)).join(' → ')}`;
   return [
-    `S.I.L.K · ${race.startTitle} → ${race.targetTitle} · ${result.difficulty.label}`,
+    `S.I.L.K · ${race.startTitle} → ${race.targetTitle} · ${t().difficulties[result.difficulty.id].label}`,
     `${verdict.title}${verdict.tagline ? ` ${verdict.tagline}` : ''}`,
-    line('You', race.player),
-    line('Spider', race.spider),
+    line(text.you, race.player),
+    line(text.spider, race.spider),
     GAME_URL,
   ].join('\n');
 }
@@ -85,25 +87,26 @@ export function createFinishScreen(options: FinishScreenOptions): HTMLElement {
   const { race } = result;
   const verdict = outcome(result);
   const playerWon = race.winner === 'player';
+  const text = t().finish;
 
   const timeCard = playerWon
-    ? card('Your time', formatClock(race.player.arrivedAt ?? 0), 'is-time')
+    ? card(text.yourTime, formatClock(race.player.arrivedAt ?? 0), 'is-time')
     : race.spider.arrivedAt !== null
-      ? card('Spider time', formatClock(race.spider.arrivedAt), 'is-spider')
-      : card('Race time', formatClock(race.clock.elapsed()), 'is-time');
+      ? card(text.spiderTime, formatClock(race.spider.arrivedAt), 'is-spider')
+      : card(text.raceTime, formatClock(race.clock.elapsed()), 'is-time');
 
-  const copyBtn = h('button', { class: 'btn-link', text: 'Copy both paths', attrs: { type: 'button' } });
+  const copyBtn = h('button', { class: 'btn-link', text: text.copy, attrs: { type: 'button' } });
   copyBtn.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(pathsText(result, verdict));
-      copyBtn.textContent = 'Copied';
+      copyBtn.textContent = text.copied;
     } catch {
-      copyBtn.textContent = 'Copy failed';
+      copyBtn.textContent = text.copyFailed;
     }
-    setTimeout(() => (copyBtn.textContent = 'Copy both paths'), 1800);
+    setTimeout(() => (copyBtn.textContent = text.copy), 1800);
   });
 
-  const rematch = h('button', { class: 'btn btn-primary', text: 'Rematch', attrs: { type: 'button' }, on: { click: options.onRematch } });
+  const rematch = h('button', { class: 'btn btn-primary', text: text.rematch, attrs: { type: 'button' }, on: { click: options.onRematch } });
   const element = h(
     'main',
     { class: `screen screen-finish is-${verdict.kind}` },
@@ -116,8 +119,8 @@ export function createFinishScreen(options: FinishScreenOptions): HTMLElement {
         h(
           'div',
           { class: 'finish-verdict' },
-          h('p', { class: 'kicker kicker-muted', text: `Race complete · ${race.startTitle} → ${race.targetTitle} · ${result.difficulty.label}` }),
-          h('h1', { class: 'finish-title', text: verdict.title, attrs: { id: 'finish-title' } }),
+          h('p', { class: 'kicker kicker-muted', text: `${text.complete} · ${race.startTitle} → ${race.targetTitle} · ${t().difficulties[result.difficulty.id].label}` }),
+          h('h1', { class: `finish-title ${verdict.title.length > 14 ? 'is-long' : ''}`, text: verdict.title, attrs: { id: 'finish-title' } }),
           verdict.tagline ? h('p', { class: 'finish-tagline', text: verdict.tagline }) : null,
           h('p', { class: 'finish-detail', text: verdict.detail }),
         ),
@@ -125,25 +128,25 @@ export function createFinishScreen(options: FinishScreenOptions): HTMLElement {
       ),
       h(
         'section',
-        { class: 'finish-stats', attrs: { 'aria-label': 'Stats' } },
+        { class: 'finish-stats', attrs: { 'aria-label': text.stats } },
         timeCard,
-        card('Your hops', String(race.player.hops), 'is-player'),
-        card('Spider hops', String(race.spider.hops), 'is-spider'),
-        card('Words eaten', result.wordsEaten.toLocaleString('en-US'), 'is-words'),
+        card(text.yourHops, String(race.player.hops), 'is-player'),
+        card(text.spiderHops, String(race.spider.hops), 'is-spider'),
+        card(text.wordsEaten, result.wordsEaten.toLocaleString(t().numberLocale), 'is-words'),
       ),
-      h('section', { class: 'finish-paths' }, pathCard('Your path', race.player.path, 'is-player', race.targetTitle), pathCard("Spider's path", race.spider.path, 'is-spider', race.targetTitle)),
+      h('section', { class: 'finish-paths' }, pathCard(text.yourPath, race.player.path, 'is-player', race.targetTitle), pathCard(text.spiderPath, race.spider.path, 'is-spider', race.targetTitle)),
       h(
         'div',
         { class: 'finish-actions' },
         rematch,
-        h('button', { class: 'btn btn-ghost', text: 'New pair', attrs: { type: 'button' }, on: { click: options.onNewPair } }),
+        h('button', { class: 'btn btn-ghost', text: text.newPair, attrs: { type: 'button' }, on: { click: options.onNewPair } }),
         copyBtn,
       ),
       h(
         'p',
         { class: 'finish-foot' },
-        'Article text from Wikipedia, CC BY-SA 4.0. ',
-        h('a', { text: 'Source code', attrs: { href: REPO_URL, target: '_blank', rel: 'noopener noreferrer' } }),
+        text.foot,
+        h('a', { text: text.source, attrs: { href: REPO_URL, target: '_blank', rel: 'noopener noreferrer' } }),
       ),
     ),
   );
@@ -156,12 +159,6 @@ function card(label: string, value: string, className: string): HTMLElement {
   return h('div', { class: `stat-card ${className}` }, h('span', { class: 'stat-label', text: label }), h('strong', { class: 'stat-value', text: value }));
 }
 
-const NOTE_TAGS: Record<string, string> = {
-  snatch: 'snatched',
-  'dead-end': 'backtrack',
-  swap: 'swapped',
-};
-
 function pathCard(title: string, path: PathStep[], className: string, target: string): HTMLElement {
   return h(
     'section',
@@ -171,11 +168,12 @@ function pathCard(title: string, path: PathStep[], className: string, target: st
       'ol',
       { class: 'path-list' },
       ...path.map((step) => {
-        const tag = step.via === 'swap' ? 'swapped' : step.via === 'back' ? 'back' : step.note ? NOTE_TAGS[step.note] : undefined;
+        const tags = t().finish.tags;
+        const tag = step.via === 'swap' ? tags.swap : step.via === 'back' ? tags.back : step.note ? tags[step.note] : undefined;
         return h(
           'li',
           { class: `path-step ${step.title === target ? 'is-target' : ''}` },
-          h('a', { text: step.title, attrs: { href: wikipediaUrl(step.title), target: '_blank', rel: 'noopener noreferrer' } }),
+          h('a', { text: step.title, attrs: { href: wikipediaUrl(step.title, lang()), target: '_blank', rel: 'noopener noreferrer' } }),
           tag ? h('span', { class: 'path-tag', text: tag }) : null,
         );
       }),

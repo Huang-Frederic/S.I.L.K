@@ -122,3 +122,56 @@ describe('sanitizeArticle', () => {
     expect(table.parentElement?.className).toBe('wiki-table-wrap');
   });
 });
+
+/** A condensed French Wikipedia (Parsoid) page: frwiki's own namespaces, sections, banners and infoboxes. */
+const PARSOID_FR = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Araignée</title></head>
+<body class="mw-parser-output">
+<section data-mw-section-id="0">
+  <div class="bandeau-container homonymie plainlinks hatnote">Pour les articles homonymes, voir <a rel="mw:WikiLink" href="./Araign%C3%A9e_(homonymie)">Araignée (homonymie)</a>.</div>
+  <div class="bandeau-container bandeau-article metadata"><a rel="mw:WikiLink" href="./Aide:Sources">Cet article ne cite pas ses sources</a>.</div>
+  <div class="infobox_v3 noarchive"><div class="entete">Araignée</div>
+    <table><caption>Classification</caption><tbody><tr><th scope="row">Règne</th><td><a rel="mw:WikiLink" href="./Animalia">Animalia</a></td></tr></tbody></table>
+  </div>
+  <p>Les <b>araignées</b> sont des <a rel="mw:WikiLink" href="./Arthropoda">arthropodes</a> qui tissent de la
+  <a rel="mw:WikiLink" href="./Soie_d%27araign%C3%A9e">soie</a>, voir <a rel="mw:WikiLink" href="./Fichier:Araignee.jpg">l’image</a>,
+  <a rel="mw:WikiLink" href="./Cat%C3%A9gorie:Araneae">la catégorie</a> et <a rel="mw:WikiLink" href="./Portail:Arachnologie">le portail</a>.</p>
+</section>
+<section data-mw-section-id="1"><div class="mw-heading mw-heading2"><h2 id="Anatomie">Anatomie</h2></div>
+  <p>Les pattes sont fixées au <a rel="mw:WikiLink" href="./C%C3%A9phalothorax">céphalothorax</a>.</p>
+</section>
+<section data-mw-section-id="2"><div class="mw-heading mw-heading2"><h2 id="Notes_et_références">Notes et références</h2></div>
+  <p><a rel="mw:WikiLink" href="./Seulement_en_note">Seulement en note</a></p>
+</section>
+<section data-mw-section-id="3"><div class="mw-heading mw-heading2"><h2 id="Annexes">Annexes</h2></div>
+  <section data-mw-section-id="4"><div class="mw-heading mw-heading3"><h3 id="Articles_connexes">Articles connexes</h3></div>
+    <ul><li><a rel="mw:WikiLink" href="./Toile_d%27araign%C3%A9e">Toile d’araignée</a></li></ul></section>
+  <section data-mw-section-id="5"><div class="mw-heading mw-heading3"><h3 id="Bibliographie">Bibliographie</h3></div>
+    <ul><li><a rel="mw:WikiLink" href="./Livre_cit%C3%A9">Livre cité</a></li></ul></section>
+  <section data-mw-section-id="6"><div class="mw-heading mw-heading3"><h3 id="Liens_externes">Liens externes</h3></div>
+    <ul><li><a rel="mw:WikiLink" href="./Lien_de_section_externe">x</a></li></ul></section>
+</section>
+<ul id="bandeau-portail" class="bandeau-portail"><li><a rel="mw:WikiLink" href="./Portail:Arachnologie">Portail de l’arachnologie</a></li></ul>
+</body></html>`;
+
+describe('sanitizeArticle on French Wikipedia', () => {
+  const { body, linkCount } = sanitizeArticle(PARSOID_FR, { title: 'Araignée', lang: 'fr' });
+
+  it('keeps links to articles only, whatever frwiki calls its namespaces', () => {
+    expect(linkTitles(body)).toEqual(['Araignée (homonymie)', 'Animalia', 'Arthropoda', "Soie d'araignée", 'Céphalothorax', "Toile d'araignée"]);
+    expect(linkCount).toBe(6);
+  });
+
+  it('drops notes, bibliography, external links, banners and the portal bar, but keeps the related articles', () => {
+    const text = body.textContent ?? '';
+    for (const gone of ['Seulement en note', 'Livre cité', 'Liens externes', 'Cet article ne cite pas', 'Portail de l’arachnologie']) expect(text).not.toContain(gone);
+    expect(text).toContain('Articles connexes');
+    expect(body.querySelector('.wiki-hatnote')?.textContent).toContain('Pour les articles homonymes');
+  });
+
+  it('styles frwiki infoboxes as infoboxes, without scrolling wrappers inside', () => {
+    const infobox = body.querySelector('.wiki-infobox')!;
+    expect(infobox).not.toBeNull();
+    expect(infobox.textContent).toContain('Règne');
+    expect(infobox.querySelector('.wiki-table-wrap')).toBeNull();
+  });
+});

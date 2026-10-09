@@ -5,6 +5,7 @@
  * web fonts are ready).
  */
 import { CYAN, drawLabel, drawLaser, drawSilk, LINE, MONO, RED, strokeBox } from '../fx/fx';
+import { t } from '../i18n';
 import { drawWordTag, SpiderRig, type Foothold, type Ground } from '../spider/rig';
 import type { Box, Point } from '../stage/stage';
 import { h } from './dom';
@@ -121,11 +122,11 @@ const PAINTERS: Record<IllustrationKind, (ctx: CanvasRenderingContext2D) => void
       ctx.globalAlpha = 1;
       if (i === 1) {
         strokeBox(ctx, link, CYAN, { pad: 4, glow: true });
-        drawLabel(ctx, '0.82 backlink', link.left - 4, link.bottom + 16, CYAN);
+        drawLabel(ctx, t().art.backlink, link.left - 4, link.bottom + 16, CYAN);
       } else drawLabel(ctx, ['0.44', '', '0.61', '0.37'][i], link.left, link.top - 12, LINE, { boxed: false });
     });
     rig.draw(ctx);
-    caption(ctx, 'scanning 38 links…');
+    caption(ctx, t().art.scanning);
   },
   crawl(ctx) {
     const lines = layout(11);
@@ -159,12 +160,12 @@ const PAINTERS: Record<IllustrationKind, (ctx: CanvasRenderingContext2D) => void
     ctx.fillStyle = CYAN;
     ctx.fillRect(W - 6, 70, 2, 22);
     ctx.fillRect(4, 190, 2, 30);
-    caption(ctx, 'LOCKED · raster_graphics', RED);
+    caption(ctx, t().art.locked, RED);
   },
   hop(ctx) {
     ctx.font = `600 28px "Source Serif 4", "Source Serif Pro", Charter, Georgia, serif`;
     ctx.fillStyle = LINE;
-    ctx.fillText('Raster graphics', 26, 48);
+    ctx.fillText(t().art.title, 26, 48);
     const lines = layout(9, 104, 6);
     for (const line of lines) {
       const shift = Math.sin(line.y * 1.7) * 26;
@@ -191,7 +192,7 @@ const PAINTERS: Record<IllustrationKind, (ctx: CanvasRenderingContext2D) => void
     rig.update(0.5);
     drawSilk(ctx, [{ x: 340, y: 0 }, rig.top()], 0.9);
     rig.draw(ctx);
-    caption(ctx, '+1 HOP · hops: 7', RED, true);
+    caption(ctx, t().art.hop, RED, true);
   },
   laser(ctx) {
     const lines = layout(21);
@@ -205,14 +206,14 @@ const PAINTERS: Record<IllustrationKind, (ctx: CanvasRenderingContext2D) => void
     ctx.fillStyle = LINE;
     ctx.translate(cut.x - 26, cut.y - 4);
     ctx.rotate(-0.18);
-    ctx.fillText('appr', -30, 0);
+    ctx.fillText(t().art.cut[0], -30, 0);
     ctx.restore();
     ctx.save();
     ctx.font = `600 22px "Source Serif 4", Charter, Georgia, serif`;
     ctx.fillStyle = LINE;
     ctx.translate(cut.x + 8, cut.y + 8);
     ctx.rotate(0.16);
-    ctx.fillText('oach', 0, 0);
+    ctx.fillText(t().art.cut[1], 0, 0);
     ctx.restore();
     ctx.fillStyle = RED;
     ctx.fillRect(cut.x - 4, cut.y + 10, 3, 3);
@@ -226,7 +227,7 @@ const PAINTERS: Record<IllustrationKind, (ctx: CanvasRenderingContext2D) => void
     drawText(ctx, lines, { skip: holes });
     for (const hole of holes) strokeBox(ctx, { ...hole, top: hole.top - 6, bottom: hole.bottom + 6 }, CYAN, { dash: [3, 3] });
     const rig = spider(200, 200, lines);
-    rig.carried = { text: 'colour', side: 1 };
+    rig.carried = { text: t().art.carried, side: 1 };
     rig.draw(ctx);
     ctx.strokeStyle = 'rgba(240, 244, 248, 0.4)';
     for (const off of [0, 12, 24]) {
@@ -235,7 +236,7 @@ const PAINTERS: Record<IllustrationKind, (ctx: CanvasRenderingContext2D) => void
       ctx.lineTo(332 + off, 64 - off * 0.2);
       ctx.stroke();
     }
-    drawWordTag(ctx, 'scenes', 370, 46, 0.42);
+    drawWordTag(ctx, t().art.thrown, 370, 46, 0.42);
     caption(ctx, 'grab(word).throw()', CYAN);
   },
   stomp(ctx) {
@@ -307,7 +308,7 @@ const PAINTERS: Record<IllustrationKind, (ctx: CanvasRenderingContext2D) => void
     ctx.save();
     ctx.translate(tag.x, tag.y);
     ctx.font = `600 18px "Source Serif 4", Charter, Georgia, serif`;
-    const w = ctx.measureText('raster graphics').width + 18;
+    const w = ctx.measureText(t().art.link).width + 18;
     ctx.fillStyle = '#101418';
     ctx.fillRect(-w / 2, -15, w, 30);
     ctx.strokeStyle = CYAN;
@@ -318,7 +319,7 @@ const PAINTERS: Record<IllustrationKind, (ctx: CanvasRenderingContext2D) => void
     ctx.fillStyle = LINE;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('raster graphics', 0, 1);
+    ctx.fillText(t().art.link, 0, 1);
     ctx.restore();
     drawLabel(ctx, 'web.shoot(link).zip()', 250, H - 26, LINE, { boxed: false });
   },

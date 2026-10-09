@@ -3,15 +3,16 @@
  *
  * Titles travel through the game in their "display" form ("Albert Einstein"):
  * spaces instead of underscores and an upper-cased first letter, which is how
- * English Wikipedia normalizes them. Comparing normalized titles lets us match
- * links, API results and the target reliably.
+ * English and French Wikipedia normalize them. Comparing normalized titles
+ * lets us match links, API results and the target reliably.
  */
+import type { Lang } from '../i18n';
 
 /**
  * Namespace prefixes (and their aliases) on English Wikipedia that are NOT the
  * main/article namespace. Lower-cased for case-insensitive comparison.
  */
-const NON_ARTICLE_NAMESPACES = new Set([
+const ENGLISH_NAMESPACES = [
   'talk',
   'user',
   'user talk',
@@ -54,9 +55,51 @@ const NON_ARTICLE_NAMESPACES = new Set([
   'event',
   'event talk',
   'topic',
-]);
+];
 
-/** Normalizes a title the way MediaWiki does for English Wikipedia. */
+/**
+ * French Wikipedia's own names for them (the English ones work there too):
+ * Parsoid writes links with these ("./Fichier:…", "./Catégorie:…").
+ */
+const FRENCH_NAMESPACES = [
+  'discussion',
+  'utilisateur',
+  'utilisatrice',
+  'discussion utilisateur',
+  'discussion utilisatrice',
+  'wikipédia',
+  'discussion wikipédia',
+  'fichier',
+  'discussion fichier',
+  'média',
+  'discussion mediawiki',
+  'modèle',
+  'discussion modèle',
+  'aide',
+  'discussion aide',
+  'catégorie',
+  'discussion catégorie',
+  'portail',
+  'discussion portail',
+  'projet',
+  'discussion projet',
+  'référence',
+  'discussion référence',
+  'discussion module',
+  'spécial',
+  'sujet',
+  'discussion gadget',
+  'définition de gadget',
+  'discussion définition de gadget',
+  'discussion timedtext',
+];
+
+const NON_ARTICLE_NAMESPACES: Record<Lang, ReadonlySet<string>> = {
+  en: new Set(ENGLISH_NAMESPACES),
+  fr: new Set([...ENGLISH_NAMESPACES, ...FRENCH_NAMESPACES]),
+};
+
+/** Normalizes a title the way MediaWiki does on English and French Wikipedia. */
 export function normalizeTitle(raw: string): string {
   const t = raw.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
   if (!t) return '';
@@ -65,12 +108,12 @@ export function normalizeTitle(raw: string): string {
   return first.toUpperCase() + t.slice(first.length);
 }
 
-/** True when the title belongs to the main (article) namespace. */
-export function isArticleTitle(title: string): boolean {
+/** True when the title belongs to the main (article) namespace of that Wikipedia. */
+export function isArticleTitle(title: string, lang: Lang = 'en'): boolean {
   const colon = title.indexOf(':');
   if (colon > 0) {
     const prefix = title.slice(0, colon).trim().toLowerCase();
-    if (NON_ARTICLE_NAMESPACES.has(prefix)) return false;
+    if (NON_ARTICLE_NAMESPACES[lang].has(prefix)) return false;
   }
   return title.length > 0;
 }
@@ -110,9 +153,9 @@ export function titleToPathSegment(title: string): string {
   return encodeURIComponent(normalizeTitle(title).replace(/ /g, '_'));
 }
 
-/** Public URL of an article on English Wikipedia. */
-export function wikipediaUrl(title: string): string {
-  return `https://en.wikipedia.org/wiki/${titleToPathSegment(title)}`;
+/** Public URL of an article on that Wikipedia. */
+export function wikipediaUrl(title: string, lang: Lang): string {
+  return `https://${lang}.wikipedia.org/wiki/${titleToPathSegment(title)}`;
 }
 
 /**

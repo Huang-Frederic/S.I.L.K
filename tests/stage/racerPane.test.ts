@@ -3,6 +3,7 @@
  * (jsdom has no layout, so geometry is not tested here).
  */
 import { describe, expect, it } from 'vitest';
+import { setLang } from '../../src/i18n';
 import type { CandidateLink } from '../../src/spider/ai/types';
 import { findAnchor } from '../../src/spider/runner';
 import { RacerPane } from '../../src/stage/racerPane';
@@ -19,13 +20,18 @@ describe('RacerPane', () => {
   it('follows its owner: badge, colours, back button, clickability', () => {
     const pane = new RacerPane('player', 'left');
     expect(pane.element.classList.contains('is-player')).toBe(true);
-    expect(pane.badgeElement.textContent).toBe('YOU');
+    // French by default.
+    expect(pane.badgeElement.textContent).toBe('TOI');
     expect(pane.scroller.inert).toBe(false);
 
     pane.setOwner('spider');
     expect(pane.element.classList.contains('is-spider')).toBe(true);
     expect(pane.element.classList.contains('is-player')).toBe(false);
+    expect(pane.badgeElement.textContent).toBe('ARAIGNÉE');
+    setLang('en');
+    pane.setOwner('spider');
     expect(pane.badgeElement.textContent).toBe('SPIDER');
+    setLang('fr');
     expect(pane.scroller.inert).toBe(true);
     expect(pane.element.querySelector<HTMLElement>('.pane-back')!.hidden).toBe(true);
     expect(pane.element.querySelector<HTMLElement>('.brain')!.hidden).toBe(false);

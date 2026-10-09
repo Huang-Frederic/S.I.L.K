@@ -1,37 +1,41 @@
 /**
  * Mini-spiders (Hard): they burst out of a fake link when the player clicks
- * it. Each one scatters, then runs for the link nearest to the cursor and
- * eats it, then goes for the next one, until it has eaten its fill or dies
- * of old age (or the page changes under its feet).
+ * it, scatter, then wander about the player's page, slowly, breaking every
+ * word they walk over (links included, which can no longer be clicked),
+ * until they die of old age (or the page changes under their feet).
  */
-import { LINE, RED } from '../fx/fx';
 import { OPEN_GROUND, SpiderRig } from '../spider/rig';
 import type { RacerPane } from '../stage/racerPane';
 import { Z, type Point, type Stage } from '../stage/stage';
-import { center, distanceToBox, focusPoint, type AttackContext } from './context';
+import { center, type AttackContext } from './context';
 
 interface Mini {
   rig: SpiderRig;
-  target: HTMLAnchorElement | null;
   /** Where it scatters to first, out of the fake link. */
   scatter: Point | null;
-  eaten: number;
+  /** Where it wanders to next. */
+  goal: Point | null;
+  /** Seconds until it breaks the next word under it. */
+  chew: number;
   age: number;
   dying: number;
 }
 
-const MINI_SPEED = 130;
-const MINI_LIFE = 11;
-const MINI_MEALS = 2;
+/** Wandering speed (px/s): they take their time. */
+const MINI_SPEED = 42;
+const MINI_LIFE = 16;
+/** Seconds between two words broken by one mini-spider. */
+const CHEW: readonly [number, number] = [0.45, 0.9];
 /** How long a mini-spider takes to pop out to full size (s). */
 const POP = 0.25;
+
+const between = ([lo, hi]: readonly [number, number]) => lo + Math.random() * (hi - lo);
 
 /** The mini-spiders living in one pane (content coordinates). */
 class Brood {
   readonly z = Z.minions;
   readonly minis: Mini[] = [];
   private readonly generation: number;
-  private retarget = 0;
 
   constructor(
     private readonly ctx: AttackContext,
@@ -50,17 +54,12 @@ class Brood {
     const { ctx, pane } = this;
     // The pane was stolen by the spider: the babies give up.
     const orphaned = pane.owner !== 'player';
-    this.retarget -= dt;
-    const pickTargets = this.retarget <= 0;
-    if (pickTargets) this.retarget = 0.25;
-    const links = pickTargets ? pane.visibleLinks((a) => pane.usable(a) && !a.dataset.decoy) : [];
-    const focus = focusPoint(ctx, pane);
-    const speed = MINI_SPEED * (ctx.difficulty.id === 'hard' ? 1 : 0.7);
+    const speed = MINI_SPEED * (ctx.difficulty.id === 'hard' ? 1 : 0.75);
 
     for (const mini of [...this.minis]) {
       mini.age += dt;
       const rig = mini.rig;
-      if (orphaned || mini.age > MINI_LIFE || mini.eaten >= MINI_MEALS) mini.dying += dt;
+      if (orphaned || mini.age > MINI_LIFE) mini.dying += dt;
       if (mini.dying > 0) {
         rig.scale = Math.min(rig.scale, Math.max(0, 1 - mini.dying / 0.4));
         rig.update(dt, OPEN_GROUND);
@@ -68,45 +67,59 @@ class Brood {
         continue;
       }
       rig.scale = Math.min(1, mini.age / POP);
-      // Always the link nearest to where the player is looking.
-      if (pickTargets && links.length) {
-        mini.target = links.reduce((best, l) => (distanceToBox(focus, l.box) < distanceToBox(focus, pane.linkBox(best)) ? l.el : best), links[0].el);
-      }
-      if (mini.target && !pane.usable(mini.target)) mini.target = null;
-      const goal = mini.scatter ?? (mini.target ? center(pane.linkBox(mini.target)) : null);
-      if (!goal) {
-        rig.update(dt, OPEN_GROUND);
-        continue;
-      }
+      const goal = mini.scatter ?? (mini.goal ??= this.wanderFrom(rig));
       const dx = goal.x - rig.x;
       const dy = goal.y - rig.y;
       const d = Math.hypot(dx, dy);
-      if (d < 6) {
+      if (d < 4) {
         if (mini.scatter) mini.scatter = null;
-        else if (mini.target) {
-          this.eat(mini, mini.target);
-          mini.target = null;
-        }
+        else mini.goal = null;
       } else {
-        const step = Math.min(d, speed * (mini.scatter ? 1.4 : 1) * dt);
+        const step = Math.min(d, speed * (mini.scatter ? 2.5 : 1) * dt);
         rig.x += (dx / d) * step;
         rig.y += (dy / d) * step;
         rig.face({ x: dx, y: dy });
         rig.lookAt = goal;
+      }
+      // It breaks whatever word it is walking on, one at a time.
+      if (!mini.scatter && (mini.chew -= dt) <= 0) {
+        mini.chew = between(CHEW);
+        this.chew(mini);
       }
       rig.update(dt, OPEN_GROUND);
     }
     return this.alive;
   }
 
-  private eat(mini: Mini, link: HTMLAnchorElement): void {
-    const { ctx, pane } = this;
-    pane.damageLink(link, 'eaten');
-    mini.eaten++;
-    mini.rig.wiggle(0.3);
-    const words = (link.textContent ?? '').trim().split(/\s+/).filter(Boolean).length;
-    ctx.actor.countEaten(words);
-    ctx.fragments.burst(pane.toStage(center(pane.linkBox(link))), { count: 16, colors: [RED, LINE, '#88A3E8'], speed: [30, 110], life: [0.2, 0.4], gravity: 120 });
+  /** Somewhere nearby on the visible text with words left to break, to wander to. */
+  private wanderFrom(from: Point): Point {
+    const view = this.pane.visibleContent();
+    const article = this.pane.articleBox() ?? view;
+    const left = Math.max(view.left, article.left) + 20;
+    const right = Math.max(left, Math.min(view.right, article.right) - 20);
+    const top = Math.max(view.top, article.top) + 30;
+    const bottom = Math.max(top, Math.min(view.bottom, article.bottom) - 30);
+    const area = { left: Math.max(left, from.x - 220), right: Math.min(right, from.x + 220), top: Math.max(top, from.y - 140), bottom: Math.min(bottom, from.y + 140) };
+    this.pane.words.ensure(area);
+    const intact = this.pane.words.inside(area, (w) => !w.gone && !w.link?.dataset.decoy && Math.abs(w.box.left - from.x) + Math.abs(w.box.top - from.y) > 40);
+    if (intact.length) return center(intact[Math.floor(Math.random() * intact.length)].box);
+    const angle = Math.random() * Math.PI * 2;
+    const reach = 50 + Math.random() * 110;
+    return {
+      x: Math.min(Math.max(from.x + Math.cos(angle) * reach, left), right),
+      y: Math.min(Math.max(from.y + Math.sin(angle) * reach * 0.6, top), bottom),
+    };
+  }
+
+  /** Breaks the word under a mini-spider (and with it, the link it belongs to). */
+  private chew(mini: Mini): void {
+    const { pane, ctx } = this;
+    const at = { x: mini.rig.x, y: mini.rig.y };
+    pane.words.ensure({ left: at.x - 40, right: at.x + 40, top: at.y - 30, bottom: at.y + 30 });
+    const word = pane.words.nearest(at, 26, (w) => !w.gone && !w.link?.dataset.decoy);
+    if (!word) return;
+    ctx.actor.crumbleWord(word, pane);
+    mini.rig.wiggle(0.15);
   }
 
   draw(c: CanvasRenderingContext2D): void {
@@ -127,7 +140,7 @@ export function clearMinis(stage: Stage): void {
 
 /**
  * Lets `count` mini-spiders out at `at` (content coordinates of `pane`):
- * they scatter around it, then go for the player's links.
+ * they scatter around it, then wander off, breaking words as they go.
  */
 export function releaseMinis(ctx: AttackContext, pane: RacerPane, at: Point, count: number): void {
   if (count <= 0) return;
@@ -144,7 +157,7 @@ export function releaseMinis(ctx: AttackContext, pane: RacerPane, at: Point, cou
     const scatter = { x: at.x + Math.cos(angle) * (40 + Math.random() * 30), y: at.y + Math.sin(angle) * (26 + Math.random() * 20) };
     rig.face({ x: scatter.x - at.x, y: scatter.y - at.y });
     rig.heading = rig.targetHeading;
-    brood.minis.push({ rig, target: null, scatter, eaten: 0, age: 0, dying: 0 });
+    brood.minis.push({ rig, scatter, goal: null, chew: between(CHEW), age: 0, dying: 0 });
   }
   let all = broods.get(ctx.stage);
   if (!all) broods.set(ctx.stage, (all = new Set()));

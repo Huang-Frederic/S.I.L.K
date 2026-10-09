@@ -4,13 +4,17 @@
  *  - Action API (with origin=* for anonymous CORS) for links, backlinks,
  *    page info, random pages and opensearch autocomplete.
  */
-import { API_USER_AGENT, MAX_CONCURRENT_REQUESTS, WIKI_ACTION_API, WIKI_REST_BASE } from '../config';
+import { API_USER_AGENT, MAX_CONCURRENT_REQUESTS, wikiActionApi, wikiRestBase } from '../config';
+import { t, type Lang } from '../i18n';
 import { HttpError, HttpQueue } from './http';
 import { normalizeTitle, titleFromRestUrl, titleToPathSegment } from './titles';
 
 export class ArticleNotFoundError extends Error {
-  constructor(readonly title: string) {
-    super(`The article “${title}” does not exist on English Wikipedia.`);
+  constructor(
+    readonly title: string,
+    lang: Lang = 'en',
+  ) {
+    super(t(lang).errors.missing(title));
     this.name = 'ArticleNotFoundError';
   }
 }
@@ -87,25 +91,29 @@ interface ApiQueryResponse {
 }
 
 export interface WikiClientOptions {
+  /** Which Wikipedia (English by default). */
+  lang?: Lang;
   http?: HttpQueue;
   restBase?: string;
   actionApi?: string;
 }
 
 export class WikiClient {
+  readonly lang: Lang;
   readonly http: HttpQueue;
   private readonly restBase: string;
   private readonly actionApi: string;
 
   constructor(options: WikiClientOptions = {}) {
+    this.lang = options.lang ?? 'en';
     this.http =
       options.http ??
       new HttpQueue({
         maxConcurrent: MAX_CONCURRENT_REQUESTS,
         headers: { 'Api-User-Agent': API_USER_AGENT },
       });
-    this.restBase = options.restBase ?? WIKI_REST_BASE;
-    this.actionApi = options.actionApi ?? WIKI_ACTION_API;
+    this.restBase = options.restBase ?? wikiRestBase(this.lang);
+    this.actionApi = options.actionApi ?? wikiActionApi(this.lang);
   }
 
   private apiUrl(params: Record<string, string>): string {
@@ -125,7 +133,7 @@ export class WikiClient {
     try {
       response = await this.http.getText(url, { priority: options.priority });
     } catch (error) {
-      if (error instanceof HttpError && error.status === 404) throw new ArticleNotFoundError(requestedTitle);
+      if (error instanceof HttpError && error.status === 404) throw new ArticleNotFoundError(requestedTitle, this.lang);
       throw error;
     }
     const canonical =

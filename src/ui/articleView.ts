@@ -3,6 +3,7 @@
  * attribution, and reports clicks on playable links.
  */
 import type { LoadedArticle } from '../wiki/articles';
+import { lang, t } from '../i18n';
 import { wikipediaUrl } from '../wiki/titles';
 import { h } from './dom';
 
@@ -65,20 +66,19 @@ export class ArticleView {
   render(loaded: LoadedArticle): HTMLElement {
     this.current = loaded;
     const { article } = loaded;
+    const text = t().article;
     const articleEl = h(
       'article',
-      { class: 'wiki-article', attrs: { lang: 'en' } },
+      { class: 'wiki-article', attrs: { lang: t().htmlLang } },
       h('h1', { class: 'wiki-title', text: loaded.title }),
       h(
         'p',
         { class: 'wiki-subtitle' },
-        'From Wikipedia, the free encyclopedia',
+        text.subtitle,
         article.description ? h('span', { class: 'wiki-shortdesc', text: ` · ${article.description}` }) : null,
       ),
-      loaded.redirectedFrom ? h('p', { class: 'wiki-redirect-note', text: `(Redirected from ${loaded.redirectedFrom})` }) : null,
-      article.isDisambiguation
-        ? h('p', { class: 'wiki-disambig-note', text: 'This is a disambiguation page: it lists articles that share a similar title.' })
-        : null,
+      loaded.redirectedFrom ? h('p', { class: 'wiki-redirect-note', text: text.redirected(loaded.redirectedFrom) }) : null,
+      article.isDisambiguation ? h('p', { class: 'wiki-disambig-note', text: text.disambiguation }) : null,
       article.body.cloneNode(true),
       this.withAttribution ? attribution(loaded.title) : null,
     );
@@ -133,17 +133,18 @@ export class ArticleView {
 
 /** CC BY-SA attribution footer required for reusing Wikipedia text. */
 function attribution(title: string): HTMLElement {
-  const url = wikipediaUrl(title);
+  const url = wikipediaUrl(title, lang());
   const external = { target: '_blank', rel: 'noopener noreferrer' };
+  const [before, , open, authors, under, after] = t().article.attribution(title);
   return h(
     'footer',
     { class: 'wiki-attribution' },
-    'Text from the Wikipedia article “',
+    before,
     h('a', { attrs: { href: url, ...external }, text: title }),
-    '” (',
-    h('a', { attrs: { href: `${url}?action=history`, ...external }, text: 'authors' }),
-    '), available under ',
+    open,
+    h('a', { attrs: { href: `${url}?action=history`, ...external }, text: authors }),
+    under,
     h('a', { attrs: { href: 'https://creativecommons.org/licenses/by-sa/4.0/', ...external }, text: 'CC BY-SA 4.0' }),
-    '. Shown in simplified form: images, references and navigation boxes were removed.',
+    after,
   );
 }

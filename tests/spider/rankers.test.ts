@@ -22,6 +22,8 @@ describe('lexical scoring', () => {
     expect(stem('glass')).toBe('glass');
     expect(stem('genus')).toBe('genus');
     expect(tokenize('Café Über')).toEqual(['cafe', 'uber']);
+    // French stopwords go too.
+    expect(tokenize('La Révolution française et les droits de l’homme')).toEqual(['revolution', 'francaise', 'droit', 'homme']);
   });
 
   it('weights title words above summary words', () => {

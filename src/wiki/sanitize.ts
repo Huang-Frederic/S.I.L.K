@@ -8,6 +8,7 @@
  * in the article body stay clickable; references, navboxes, edit links,
  * external links, red links and self links are turned into plain text.
  */
+import type { Lang } from '../i18n';
 import { isArticleTitle, normalizeTitle, parseWikiHref } from './titles';
 
 export interface SanitizedArticle {
@@ -76,6 +77,10 @@ const REMOVED_SELECTORS = [
   '.dmbox',
   '.mbox-small',
   '.portalbox',
+  // French Wikipedia: portal bar, sister-project box (its banners are .metadata)
+  '.bandeau-portail',
+  '#bandeau-portail',
+  '.autres-projets',
   '.sistersitebox',
   '.side-box',
   '.noprint',
@@ -97,9 +102,9 @@ const REMOVED_SELECTORS = [
   '[style*="display: none"]',
 ].join(',');
 
-/** Sections that are not part of the article body proper. */
+/** Sections that are not part of the article body proper (English and French). */
 const EXCLUDED_SECTION =
-  /^(references?|notes?|citations?|sources?|bibliography|further reading|external links?|footnotes|works cited|notes and references|references and notes|explanatory notes|general references|cited sources|general and cited references|primary sources|secondary sources|reference notes|endnotes|literature)$/i;
+  /^(references?|notes?|citations?|sources?|bibliography|further reading|external links?|footnotes|works cited|notes and references|references and notes|explanatory notes|general references|cited sources|general and cited references|primary sources|secondary sources|reference notes|endnotes|literature|références?|notes et références|références et notes|notes et sources|sources et références|liens? externes?|bibliographie|bibliographie et sources|sources et bibliographie|webographie|ouvrages|ouvrages cités|lectures complémentaires)$/i;
 
 /** Tags copied as-is (minus attributes). Anything else is unwrapped. */
 const KEPT_TAGS = new Set([
@@ -155,12 +160,16 @@ const KEPT_TAGS = new Set([
 
 /** Classes worth keeping for styling (others are dropped). */
 const KEPT_CLASSES = new Set(['hatnote', 'infobox', 'wikitable', 'hlist', 'plainlist', 'quotebox', 'sidebar-title']);
+/** French Wikipedia's infoboxes (and taxoboxes), styled as infoboxes. */
+const INFOBOX_CLASSES = /^(infobox_v2|infobox_v3|taxobox_v3)$/;
 
 const SELF_LINK_CLASSES = /\b(new|mw-selflink|selflink|mw-selflink-fragment)\b/;
 
 export interface SanitizeOptions {
   /** Canonical title of the page (links back to it are disabled). */
   title: string;
+  /** Which Wikipedia it comes from (namespaces differ), English by default. */
+  lang?: Lang;
   /** Document used to create the output nodes (defaults to the global one). */
   doc?: Document;
 }
@@ -179,7 +188,7 @@ export function sanitizeArticle(html: string, options: SanitizeOptions): Sanitiz
 
   const body = doc.createElement('div');
   body.className = 'wiki-body';
-  const state: BuildState = { doc, pageTitle };
+  const state: BuildState = { doc, pageTitle, lang: options.lang ?? 'en' };
   for (const child of Array.from(source.body.childNodes)) {
     appendClean(child, body, state);
   }
@@ -192,6 +201,7 @@ export function sanitizeArticle(html: string, options: SanitizeOptions): Sanitiz
 interface BuildState {
   doc: Document;
   pageTitle: string;
+  lang: Lang;
 }
 
 /** Recursively copies `node` into `parent`, keeping only allowlisted markup. */
@@ -226,7 +236,7 @@ function appendLink(el: Element, parent: Node, state: BuildState): void {
   const href = el.getAttribute('href') ?? '';
   const classes = el.getAttribute('class') ?? '';
   const target = rel.includes('mw:WikiLink') && !SELF_LINK_CLASSES.test(classes) ? parseWikiHref(href) : null;
-  const playable = target && isArticleTitle(target.title) && target.title !== state.pageTitle;
+  const playable = target && isArticleTitle(target.title, state.lang) && target.title !== state.pageTitle;
 
   if (!playable) {
     for (const child of Array.from(el.childNodes)) appendClean(child, parent, state);
@@ -264,8 +274,9 @@ function copySafeAttributes(from: Element, to: HTMLElement, tag: string): void {
   }
   const classes = (from.getAttribute('class') ?? '')
     .split(/\s+/)
+    .map((c) => (INFOBOX_CLASSES.test(c) ? 'infobox' : c))
     .filter((c) => KEPT_CLASSES.has(c) || /^infobox-(above|header|label|data|subheader|title)$/.test(c));
-  if (classes.length) to.className = classes.map((c) => `wiki-${c}`).join(' ');
+  if (classes.length) to.className = [...new Set(classes)].map((c) => `wiki-${c}`).join(' ');
 }
 
 /** Replaces MathML/fallback-image formulas with their TeX source as inline code. */
@@ -311,7 +322,7 @@ function pruneEmpty(root: HTMLElement): void {
 /** Wraps wide tables so that they scroll horizontally instead of overflowing. */
 function wrapTables(root: HTMLElement, doc: Document): void {
   root.querySelectorAll('table').forEach((table) => {
-    if (table.classList.contains('wiki-infobox') || table.parentElement?.closest('table')) return;
+    if (table.classList.contains('wiki-infobox') || table.parentElement?.closest('table, .wiki-infobox')) return;
     const wrap = doc.createElement('div');
     wrap.className = 'wiki-table-wrap';
     table.replaceWith(wrap);

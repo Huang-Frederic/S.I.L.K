@@ -3,10 +3,12 @@
  * unavailable (private mode, blocked site data), so every access is guarded
  * and the game works without it.
  */
+import { DEFAULT_LANG, isLang, type Lang } from './i18n';
 
 const KEYS = {
   reduceMotion: 'silk.reduceMotion',
   hardWins: 'silk.hardWins',
+  lang: 'silk.lang',
 } as const;
 
 function read(key: string): string | null {
@@ -51,6 +53,16 @@ export const settings = {
   onChange(listener: () => void): () => void {
     listeners.add(listener);
     return () => listeners.delete(listener);
+  },
+
+  /** The game's language (French until the player picks another one). */
+  get lang(): Lang {
+    const stored = read(KEYS.lang);
+    return isLang(stored) ? stored : DEFAULT_LANG;
+  },
+
+  set lang(value: Lang) {
+    write(KEYS.lang, value);
   },
 
   /** Wins on Hard in this browser (never a global or invented stat). */

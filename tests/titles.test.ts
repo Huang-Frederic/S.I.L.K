@@ -46,13 +46,24 @@ describe('isArticleTitle', () => {
       expect(isArticleTitle(title)).toBe(false);
     }
   });
+
+  it('knows French Wikipedia’s namespaces (and the English names, which work there too)', () => {
+    for (const title of ['Fichier:Araignée.jpg', 'Catégorie:Araneae', 'Modèle:Taxobox', 'Portail:Arachnologie', 'Aide:Homonymie', 'Discussion:Araignée', 'Spécial:Recherche', 'File:Spider.jpg']) {
+      expect(isArticleTitle(title, 'fr')).toBe(false);
+    }
+    expect(isArticleTitle('Star Wars : Un nouvel espoir', 'fr')).toBe(true);
+    expect(isArticleTitle('Araignée', 'fr')).toBe(true);
+    // In English, a French namespace name is just a title.
+    expect(isArticleTitle('Portail:Foo', 'en')).toBe(true);
+  });
 });
 
 describe('URLs', () => {
   it('encodes titles as path segments', () => {
     expect(titleToPathSegment('AC/DC')).toBe('AC%2FDC');
     expect(titleToPathSegment('C++')).toBe('C%2B%2B');
-    expect(wikipediaUrl('Albert Einstein')).toBe('https://en.wikipedia.org/wiki/Albert_Einstein');
+    expect(wikipediaUrl('Albert Einstein', 'en')).toBe('https://en.wikipedia.org/wiki/Albert_Einstein');
+    expect(wikipediaUrl('Tour Eiffel', 'fr')).toBe('https://fr.wikipedia.org/wiki/Tour_Eiffel');
   });
 
   it('reads titles back from REST URLs, before and after the 307 redirect', () => {

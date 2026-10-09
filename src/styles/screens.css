@@ -71,6 +71,45 @@
   text-underline-offset: 4px;
 }
 
+.title-links {
+  align-items: center;
+}
+
+/* FR / EN: a small segmented control. */
+.lang-picker {
+  display: inline-flex;
+  border: 1px solid var(--border-2);
+}
+
+.lang-option {
+  padding: 5px 10px;
+  border: 0;
+  background: none;
+  color: var(--dim);
+  font: 500 12.5px var(--font-mono);
+  letter-spacing: 0.12em;
+  cursor: pointer;
+}
+
+.lang-option + .lang-option {
+  border-left: 1px solid var(--border-2);
+}
+
+.lang-option:hover {
+  color: var(--line);
+}
+
+.lang-option.is-active {
+  background: var(--line);
+  color: var(--bg);
+  cursor: default;
+}
+
+.lang-option:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
 .title-hero {
   padding-top: 44px;
 }
@@ -695,7 +734,10 @@
   padding: 14px 22px 8px;
 }
 
+/* Fixed height (head + three rows), so that the article never jumps when
+   the spider's reasoning fills in or changes. */
 .brain-head {
+  min-height: 1.4em;
   color: var(--muted);
   font: 400 12.5px/1.4 var(--font-mono);
   letter-spacing: 0.06em;
@@ -706,6 +748,7 @@
 
 .brain-rows {
   display: grid;
+  grid-template-rows: repeat(3, 22.4px);
   gap: 4px;
   margin: 10px 0 0;
   padding: 0;
@@ -996,6 +1039,11 @@
   color: var(--amber);
   font: 700 clamp(64px, 10vw, 128px) / 0.95 var(--font-ui);
   letter-spacing: -0.045em;
+}
+
+/* Longer verdicts ("L’araignée gagne.") still fit on one line. */
+.finish-title.is-long {
+  font-size: clamp(48px, 6.6vw, 96px);
 }
 
 .is-lose .finish-title {
@@ -1304,7 +1352,21 @@
 
 @media (max-width: 640px) {
   .title-links {
-    gap: 18px;
+    gap: 14px;
+  }
+
+  .title-links a {
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  /* The big logo is right below. */
+  .title-version {
+    display: none;
+  }
+
+  .title-nav {
+    justify-content: flex-end;
   }
 
   .demo-card {

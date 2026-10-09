@@ -27,6 +27,21 @@ describe('approach', () => {
   it('just walks on when already on the line', () => {
     expect(approach(link, { x: 200, y: 312 }, 15).runIn).toEqual({ x: 200, y: 312 });
   });
+
+  it('comes from the other side rather than out of the margin, at the start of a line', () => {
+    const column = { left: 20, right: 700 };
+    const lineStart = box(30, 300, 110);
+    const { runIn, end } = approach(lineStart, { x: 10, y: 900 }, 15, 70, column);
+    expect(end.x).toBe(123);
+    expect(runIn.x).toBeGreaterThan(end.x);
+    expect(runIn.x).toBeLessThanOrEqual(column.right);
+    // And the other way round, at the end of a line.
+    const lineEnd = box(600, 300, 690);
+    const back = approach(lineEnd, { x: 900, y: 900 }, 15, 70, column);
+    expect(back.end.x).toBe(587);
+    expect(back.runIn.x).toBeGreaterThanOrEqual(column.left);
+    expect(back.runIn.x).toBeLessThan(back.end.x);
+  });
 });
 
 describe('serpentine', () => {
@@ -60,6 +75,32 @@ describe('serpentine', () => {
     const left = serpentine(a, { x: 0, y: 200 }, { side: 1 });
     const right = serpentine(a, { x: 0, y: 200 }, { side: -1 });
     expect(Math.sign(left[10].x)).toBe(-Math.sign(right[10].x));
+  });
+});
+
+describe('serpentine across the text column', () => {
+  const column = { left: 0, right: 700 };
+
+  it('a long way, weaves across most of the column instead of hugging one side', () => {
+    for (const random of [() => 0, () => 0.5, () => 0.99]) {
+      const xs = serpentine({ x: 120, y: 0 }, { x: 140, y: 3000 }, { column, random, side: 1 }).map((p) => p.x);
+      expect(Math.min(...xs)).toBeGreaterThanOrEqual(column.left);
+      expect(Math.max(...xs)).toBeLessThanOrEqual(column.right);
+      expect(Math.max(...xs)).toBeGreaterThan(350);
+      expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(280);
+    }
+  });
+
+  it('keeps short trips tight', () => {
+    const xs = serpentine({ x: 300, y: 0 }, { x: 300, y: 300 }, { column }).map((p) => p.x);
+    expect(Math.max(...xs.map((x) => Math.abs(x - 300)))).toBeLessThanOrEqual(56);
+  });
+
+  it('never swings out of a narrow column', () => {
+    const narrow = { left: 100, right: 220 };
+    const xs = serpentine({ x: 110, y: 0 }, { x: 210, y: 2500 }, { column: narrow }).map((p) => p.x);
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(narrow.left);
+    expect(Math.max(...xs)).toBeLessThanOrEqual(narrow.right);
   });
 });
 

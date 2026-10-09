@@ -29,7 +29,7 @@ export class ArticleStore {
     }
 
     const promise = this.client.fetchArticle(key, options).then((fetched) => {
-      const article = sanitizeArticle(fetched.html, { title: fetched.title });
+      const article = sanitizeArticle(fetched.html, { title: fetched.title, lang: this.client.lang });
       return {
         title: fetched.title,
         redirectedFrom: fetched.title !== key ? key : null,
