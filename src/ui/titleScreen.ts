@@ -248,7 +248,7 @@ function difficultyPicker(initial: DifficultyId): { element: HTMLElement; value:
   return { element, value: () => radios.find((r) => r.input.checked)?.d.id ?? initial };
 }
 
-/** FR / EN: the texts, and the Wikipedia the race is run on. */
+/** EN / FR: the texts, and the Wikipedia the race is run on. */
 function languagePicker(onPick: (lang: Lang) => void): HTMLElement {
   return h(
     'div',

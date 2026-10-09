@@ -7,9 +7,9 @@ following links. You click; the spider *crawls*. It runs a small language model 
 guess which link leads closest to the target, walks over the real text to reach it (eating the words
 on its way), and dives in. On Hard it also comes after you.
 
-The game is in **French by default** (French texts, races on [fr.wikipedia.org](https://fr.wikipedia.org/));
-the **FR / EN** switch in the top bar turns it into English (English texts, races on
-[en.wikipedia.org](https://en.wikipedia.org/)). The choice is remembered in the browser.
+The game is in **English by default** (English texts, races on [en.wikipedia.org](https://en.wikipedia.org/));
+the **EN / FR** switch in the top bar turns it into French (French texts, races on
+[fr.wikipedia.org](https://fr.wikipedia.org/)). The choice is remembered in the browser.
 
 ▶ **Play: <https://huang-frederic.github.io/S.I.L.K/>**
 
@@ -20,7 +20,7 @@ the **FR / EN** switch in the top bar turns it into English (English texts, race
    of well-known topics, so every race is winnable (in theory).
 2. Choose the spider's **difficulty** (below; the game opens on Normal). Its brain is the same on
    every level; only its speed and its manners change.
-3. Click links in your pane (amber border, **TOI** badge, **YOU** in English). Only links to other articles in the body
+3. Click links in your pane (amber border, **YOU** badge, **TOI** in French). Only links to other articles in the body
    count. **← back** is allowed but counts as a hop. Hovering a link shows `hop N → Title`.
 4. First on the target wins. The finish screen compares both paths, hops, times and the number of
    words the spider ate.
@@ -190,7 +190,7 @@ src/
   main.ts                 entry point, screen switching
   config.ts               URLs, user agent, request limits
   settings.ts             language, Reduce motion, Hard-mode wins (localStorage, guarded)
-  i18n/                   French (default) and English texts
+  i18n/                   English (default) and French texts
   wiki/                   HTTP queue, API client, sanitizer, article cache, titles
   game/                   race rules, link-snatch rules, clock, difficulty table,
                           pair selection, taunts and roasts

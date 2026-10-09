@@ -27,14 +27,14 @@ describe('settings', () => {
     expect(settings.duration(1)).toBe(1);
   });
 
-  it('plays in French until told otherwise, and remembers the language', async () => {
+  it('plays in English until told otherwise, and remembers the language', async () => {
     const { settings } = await import('../src/settings');
-    expect(settings.lang).toBe('fr');
-    settings.lang = 'en';
-    expect(localStorage.getItem('silk.lang')).toBe('en');
     expect(settings.lang).toBe('en');
-    localStorage.setItem('silk.lang', 'klingon');
+    settings.lang = 'fr';
+    expect(localStorage.getItem('silk.lang')).toBe('fr');
     expect(settings.lang).toBe('fr');
+    localStorage.setItem('silk.lang', 'klingon');
+    expect(settings.lang).toBe('en');
   });
 
   it('works without storage (private mode, blocked site data)', async () => {

@@ -55,7 +55,7 @@ export const settings = {
     return () => listeners.delete(listener);
   },
 
-  /** The game's language (French until the player picks another one). */
+  /** The game's language (English until the player picks another one). */
   get lang(): Lang {
     const stored = read(KEYS.lang);
     return isLang(stored) ? stored : DEFAULT_LANG;

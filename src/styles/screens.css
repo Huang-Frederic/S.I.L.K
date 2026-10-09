@@ -75,7 +75,7 @@
   align-items: center;
 }
 
-/* FR / EN: a small segmented control. */
+/* EN / FR: a small segmented control. */
 .lang-picker {
   display: inline-flex;
   border: 1px solid var(--border-2);
