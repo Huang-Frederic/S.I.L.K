@@ -30,7 +30,7 @@ system asks for it) removes screen shake and shortens transitions; it never chan
 | --- | --- |
 | **Easy** | Thinks slowly, crawls, and destroys its own page. Never touches yours. Winnable. |
 | **Normal** | Adds a **web trap** (links near your cursor can't be clicked for a few seconds), a **laser snipe** (burns the link you are reaching for) and a **word bombardment** (words from its page land on your links and cover them), about every 25 s. **Rage** when your page links to the target: faster, angrier, glowing eye. Hard but winnable. |
-| **Hard** | Everything, every 4–8 s, chained (web, then laser the only free link, then eggs…), with no warning, rage always on, near-instant thinking and web zips everywhere. **Link snatch**: when your cursor gets within ~120 px of a link, it may leap across, eat it, wiggle, dive in, and the panes swap owners: you continue from its page. **Decoys**: up to 3 fake target links in your text, +15 s each (arriving with a penalty starts a photo finish the spider can still win). **Eggs** hatch in 3 s into mini-spiders that eat the link nearest your cursor. **Blackout**: 6 s of darkness with a shrinking flashlight. **Cursor harassment**: a silk line sticks to your cursor and drags it for 2 s. Expected win rate: almost zero. |
+| **Hard** | Everything, every 4–8 s, chained (web, then laser the only free link, then eggs…), with no warning, rage always on, near-instant thinking, and it sprints across the page smashing the text. **Link snatch**: when your cursor gets within ~120 px of a link, it may leap across, eat it, wiggle, dive in, and the panes swap owners: you continue from its page. **Decoys**: up to 3 fake target links in your text, +15 s each (arriving with a penalty starts a photo finish the spider can still win). **Eggs** hatch in 3 s into mini-spiders that eat the link nearest your cursor. **Blackout**: 6 s of darkness with a shrinking flashlight. **Cursor harassment**: a silk line sticks to your cursor and drags it for 2 s. Expected win rate: almost zero. |
 
 Hard is meant as a show, not a fair fight: people should lose, laugh, and share the clip. The spider
 may burn, web or cover the target link and may leave you with nothing clickable for a while. The
@@ -54,7 +54,12 @@ screen keeps the score (stored locally, never a global or invented statistic).
 - All requests go through one queue (`src/wiki/http.ts`): at most **3 in flight**, an in-memory
   cache keyed by URL (in-flight requests are shared), an `Api-User-Agent` header identifying the game,
   and back-off on `429` / `5xx` / network errors (`Retry-After` when readable, otherwise 5 s, 10 s,
-  15 s). The player's page loads jump the queue.
+  15 s).
+- The player never waits behind the spider: one of the 3 slots is kept for the player's page loads,
+  which also jump the queue (a page the spider had queued is promoted), skip the global back-off on
+  their first try, and start **while the cursor rests on a link** (or on touch down), so that most
+  clicks open instantly. Showing an article does no extra layout work: words are measured only where
+  the spider walks.
 
 ### Rendering articles
 
@@ -110,10 +115,11 @@ cyan) and re-plant past 90 % stretch in a strict tetrapod gait. One hop is:
 
 1. **scan**: rays from the eye to every visible link while the brain decides; the SPIDER.BRAIN panel
    shows the best scores;
-2. **crawl & eat**: the eye laser locks the link (slicing words on the way), then the spider walks
-   over the text to it, eating every word under its jaws, or **web-zips** to far links; on the way it
-   randomly lasers a word in half, plucks one and throws it off the page (`yeet()`), or stomps one
-   flat (`THUD`);
+2. **crawl & eat**: the eye laser locks the link (slicing words on the way), then the spider goes
+   there **on foot**, breaking into a run when the link is far, and eats every word under its body,
+   leaving a swath of destroyed text; on the way it randomly lasers a word in half, sweeps the laser
+   along a line, plucks a word and throws it off the page (`yeet()`), or stomps one flat (`THUD`).
+   Only a link very far down the page gets a **web zip** (a silk line, then one long jump);
 3. **grab**: the legs wrap the link, the link lights up and the pane edges glitch;
 4. **hop**: it dives in, the page glitches out in RGB-split slices, the next article glitches in,
    and the spider drops in on its silk thread.

@@ -42,14 +42,12 @@ export function createTitleScreen(options: TitleScreenOptions): TitleScreen {
   const targetField = titleField('target', 'Target page', 'e.g. Pixel art', client);
   startField.input.value = options.initialStart ?? '';
   targetField.input.value = options.initialTarget ?? '';
-  const flow = h('span', { class: 'field-flow', attrs: { 'aria-hidden': 'true' } }, '→');
-  startField.row.append(flow);
 
   const difficulty = difficultyPicker(options.initialDifficulty);
   const generalError = h('p', { class: 'field-error', attrs: { role: 'alert' } });
   generalError.hidden = true;
   const startBtn = h('button', { class: 'btn btn-primary btn-start', text: 'Start race', attrs: { type: 'submit' } });
-  const randomPairBtn = h('button', { class: 'btn-link', text: 'Random pair', attrs: { type: 'button' } });
+  const randomPairBtn = h('button', { class: 'btn btn-ghost btn-random', attrs: { type: 'button' } }, icon('dice', 18), 'Random pair');
 
   const setBusy = (busy: boolean) => {
     for (const el of [randomPairBtn, startBtn, startField.dice, targetField.dice]) el.disabled = busy;
@@ -135,30 +133,36 @@ export function createTitleScreen(options: TitleScreenOptions): TitleScreen {
     h(
       'section',
       { class: 'title-hero' },
+      // Row 1: who and what.
       h(
-        'div',
-        { class: 'hero-left' },
-        h('p', { class: 'kicker', text: 'Wikirace // you vs. a crawling spider' }),
-        h('h1', { class: 'hero-logo' }, logoMark('logo-big')),
-        h('p', { class: 'hero-sub', text: GAME_FULL_NAME }),
-        h(
-          'p',
-          { class: 'hero-pitch', text: 'Pick two Wikipedia pages. Click your way from one to the other while an AI spider crawls the same web, grabbing words and diving into links. First one there wins.' },
-        ),
-        form,
+        'header',
+        { class: 'hero-head' },
         h(
           'div',
-          { class: 'title-foot' },
-          h('p', { text: 'Article text from Wikipedia, CC BY-SA 4.0. Not affiliated with the Wikimedia Foundation.' }),
-          h(
-            'div',
-            { class: 'title-settings' },
-            h('label', { class: 'toggle', attrs: { for: 'reduce-motion' } }, reduce, h('span', { class: 'toggle-ui', attrs: { 'aria-hidden': 'true' } }), 'Reduce motion'),
-            h('span', { class: 'hard-wins', attrs: { title: 'Counted in this browser only' } }, 'Hard mode wins: ', h('strong', { text: String(wins) })),
-          ),
+          { class: 'hero-title' },
+          h('p', { class: 'kicker', text: 'Wikirace // you vs. a crawling spider' }),
+          h('h1', { class: 'hero-logo' }, logoMark('logo-big')),
+          h('p', { class: 'hero-sub', text: GAME_FULL_NAME }),
+        ),
+        h(
+          'p',
+          { class: 'hero-pitch', text: 'Pick two Wikipedia pages. Click your way from one to the other while an AI spider crawls the same web, smashing words and diving into links. First one there wins.' },
         ),
       ),
-      h('div', { class: 'hero-right' }, demo.element),
+      // Row 2: play, and watch the spider. Same height, same edges.
+      h('div', { class: 'hero-play' }, form, demo.element),
+      // Row 3: the fine print and the settings.
+      h(
+        'footer',
+        { class: 'title-foot' },
+        h('p', { text: 'Article text from Wikipedia, CC BY-SA 4.0. Not affiliated with the Wikimedia Foundation.' }),
+        h(
+          'div',
+          { class: 'title-settings' },
+          h('label', { class: 'toggle', attrs: { for: 'reduce-motion' } }, reduce, h('span', { class: 'toggle-ui', attrs: { 'aria-hidden': 'true' } }), 'Reduce motion'),
+          h('span', { class: 'hard-wins', attrs: { title: 'Counted in this browser only' } }, 'Hard mode wins: ', h('strong', { text: String(wins) })),
+        ),
+      ),
     ),
     howItWorks(),
   );
@@ -268,7 +272,7 @@ function howItWorks(): HTMLElement {
       step('laser', '', 'eye laser', 'Fires from the red eye to lock the next link, and slices words in half on the way. Sparks at the cut.'),
       step('throw', '', 'grab & throw', 'A front leg plucks a word out of the text and flings it off the page, spinning. It leaves a dashed hole behind.'),
       step('stomp', '', 'stomp', 'Slams a foot onto a short word: impact rings, a small screen shake, and the word squashes flat.'),
-      step('zip', '', 'web zip', 'When the best link is far away, it shoots a silk line at it and zips across the page in one move.'),
+      step('zip', '', 'web zip', 'Only when the best link is very far down the page: it shoots a silk line at it and zips there in one move. Otherwise it goes on foot.'),
     ),
     h('header', { class: 'how-head' }, h('h2', { text: 'Difficulty' }), h('p', { text: 'same brain on every level · only its manners change' })),
     h(
@@ -277,7 +281,7 @@ function howItWorks(): HTMLElement {
       level('Easy', 'is-easy', ['Slow thinker.', 'Only crawls and eats its own page.', 'Never attacks you.', 'Winnable.']),
       level('Normal', 'is-normal', ['Web traps, laser snipes, word bombardments.', 'About one attack every 25 s, faster in rage (when your page links to the target).', 'Hard but winnable.']),
       level('Hard', 'is-hard', [
-        'Near-instant thinking, web zips everywhere, rage always on.',
+        'Near-instant thinking, runs across the page smashing everything, rage always on.',
         'An attack every 4–8 s, chained, no warning: webs, lasers, word bombs, eggs that hatch into link-eating mini-spiders, blackouts, a silk line on your cursor, and fake target links (+15 s each).',
         'Reach for a link and it leaps across, eats it, dives in, and the panes swap.',
         'Expected win rate: almost zero.',
