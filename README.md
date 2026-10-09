@@ -4,26 +4,41 @@
 
 You and a spider start on the same English Wikipedia article and race to the same target article by
 following links. You click; the spider *crawls*. It runs a small language model in your browser to
-guess which link leads closest to the target, walks along the lines of text to reach it (eating the
-words on its way), then dives into the link.
+guess which link leads closest to the target, walks over the real text to reach it (eating the words
+on its way), and dives in. On Hard it also comes after you.
 
 ▶ **Play: <https://huang-frederic.github.io/S.I.L.K/>**
 
 ## How to play
 
-1. Pick a **start** and a **target** article. Type to get title suggestions, or roll the dice: a random
-   start is a genuinely random article, a random target comes from a pool of well-known topics, so
-   every race is winnable.
-2. Choose the spider's **difficulty**. It only changes how long the spider thinks on each page and
-   how fast it crawls, never how clever it is. *Easy* is beatable by most humans; *Hard* is not
-   forgiving.
-3. Click links in the article on the left (or the **You** tab on small screens). Only links to other
-   articles in the body count; references, navigation boxes and external links are disabled.
-   **Back** is allowed, but counts as a hop.
-4. First on the target wins. The end screen compares both paths: hops, times, every article visited,
-   and why the spider picked each link. The loser may keep going to finish their own path.
+1. Pick a **start** and a **target** page. Type to get suggestions (with their short descriptions),
+   or roll the dice: a random start is a genuinely random article, a random target comes from a pool
+   of well-known topics, so every race is winnable (in theory).
+2. Choose the spider's **difficulty** (below). Its brain is the same on every level; only its speed
+   and its manners change.
+3. Click links in your pane (amber border, **YOU** badge). Only links to other articles in the body
+   count. **← back** is allowed but counts as a hop. Hovering a link shows `hop N → Title`.
+4. First on the target wins. The finish screen compares both paths, hops, times and the number of
+   words the spider ate.
 
-The race pauses when the tab is hidden.
+The race pauses while the tab is hidden. **Reduce motion** (title screen, on by default when the
+system asks for it) removes screen shake and shortens transitions; it never changes the difficulty.
+
+### Difficulty
+
+| Level | What the spider does |
+| --- | --- |
+| **Easy** | Thinks slowly, crawls, and destroys its own page. Never touches yours. Winnable. |
+| **Normal** | Adds a **web trap** (links near your cursor can't be clicked for a few seconds), a **laser snipe** (burns the link you are reaching for) and a **word bombardment** (words from its page land on your links and cover them), about every 25 s. **Rage** when your page links to the target: faster, angrier, glowing eye. Hard but winnable. |
+| **Hard** | Everything, every 4–8 s, chained (web, then laser the only free link, then eggs…), with no warning, rage always on, near-instant thinking and web zips everywhere. **Link snatch**: when your cursor gets within ~120 px of a link, it may leap across, eat it, wiggle, dive in, and the panes swap owners: you continue from its page. **Decoys**: up to 3 fake target links in your text, +15 s each (arriving with a penalty starts a photo finish the spider can still win). **Eggs** hatch in 3 s into mini-spiders that eat the link nearest your cursor. **Blackout**: 6 s of darkness with a shrinking flashlight. **Cursor harassment**: a silk line sticks to your cursor and drags it for 2 s. Expected win rate: almost zero. |
+
+Hard is meant as a show, not a fair fight: people should lose, laugh, and share the clip. The spider
+may burn, web or cover the target link and may leave you with nothing clickable for a while. The
+spider taunts you in short speech bubbles (at most one every ~6 s), celebrates a win by walking to
+the middle of the screen, eating your **YOU** badge and dancing, and roasts you on the lose screen
+with the race's real numbers. Beat it on Hard and it collapses, its eye flickers out, and the finish
+screen says **IMPOSSIBLE. (screenshot this.)**; a per-browser "Hard mode wins" counter on the title
+screen keeps the score (stored locally, never a global or invented statistic).
 
 ## How it works
 
@@ -34,8 +49,8 @@ The race pauses when the tab is hidden.
   from the document head (or the final URL).
 - Everything else uses the Action API with `origin=*` (anonymous CORS): `generator=links` with
   `redirects=1` to resolve every link of a page, `list=backlinks` (with `blredirect=1`) for the
-  target, page info (extract, description, disambiguation flag), `generator=random`, and `opensearch`
-  for autocomplete.
+  target, page info (extract, description, disambiguation flag), `generator=random`, and
+  `generator=prefixsearch` with short descriptions for autocomplete (`opensearch` as a fallback).
 - All requests go through one queue (`src/wiki/http.ts`): at most **3 in flight**, an in-memory
   cache keyed by URL (in-flight requests are shared), an `Api-User-Agent` header identifying the game,
   and back-off on `429` / `5xx` / network errors (`Retry-After` when readable, otherwise 5 s, 10 s,
@@ -48,8 +63,8 @@ instead of trying to delete dangerous markup, so no script, style, image, event 
 survives. Reference sections ("References", "External links", "Further reading"…), citations,
 navboxes, edit links, maintenance templates, figures and galleries are dropped. A link stays playable
 only if it is a `mw:WikiLink` to another main-namespace article that is not a red link or a link to
-the page itself. The result is shown with Wikipedia-like typography in a dark theme, with a CC BY-SA
-attribution and a link to the source article at the bottom of every page.
+the page itself. The result is shown with serif typography in a dark theme, with a CC BY-SA
+attribution, a link to the source article and a link to its history (authors) under every pane.
 
 Missing pages, redirects (`Redirected from …`) and disambiguation pages are handled: disambiguation
 pages are refused as start or target, flagged when you land on one, and the spider avoids them.
@@ -73,27 +88,43 @@ Visited pages are never chosen again. The only exception is a dead end, where th
 along its thread to the previous page and tries its next best link. The library is imported at runtime
 from jsDelivr at a pinned version (its self-contained build), which keeps the game's own bundle small.
 
-### The spider's body (`src/spider/render/`)
+### The stage (`src/stage/`)
 
-The spider is a glowing line-art crawler drawn on a full-resolution canvas layered over its own copy
-of the article (devicePixelRatio-aware, drawn in the article's content coordinates so effects stay
-glued to the text while the camera scrolls).
+The race screen is two **role-agnostic panes** under one **full-window canvas** (the stage). A pane
+belongs to the player or to the spider and can change owner mid-race: the badge, the colours, the
+counters, the brain panel and whether its links can be clicked follow the owner, which is what makes
+the link snatch's pane swap possible. The stage runs one frame loop; animations are coroutines that
+`await stage.frame()`, so they read top to bottom and pause with the tab. Drawing in a pane's content
+coordinates keeps effects glued to the text while it scrolls; airborne moves (leaps, the victory walk)
+use stage coordinates and cross the gutter freely.
 
-- **Legs**: eight two-segment legs with procedural locomotion. Feet stay planted (preferably on
-  hyperlinks: the crawler walks on the web's edges) until the body moves too far, then step ahead of
-  it in an alternating tetrapod gait; knees come from two-bone inverse kinematics.
-- **Indexing**: while it thinks, a scan line sweeps the page; links light up in cyan with graph
-  edges back to the spider. The chosen link gets a pink lock-on box, a label saying why, and a
-  tracking beam.
-- **Eating**: words of the link's line are wrapped in spans on demand. The spider abseils on silk to
-  the line, then walks along it; every word its mouth passes loses its ink (its box stays, so nothing
-  reflows) and leaves a neon bite mark and a burst of data shards.
-- **Diving**: the spider spins into the link, the visible text is captured as line fragments that
-  spiral into it, and the next article streams out of the same point before the spider drops in on a
-  fresh thread.
+Words are wrapped in spans lazily, only near the spider (`WordIndex`), so long articles stay light.
+Destroyed words keep their box (dashed outline, strike-through, 20 % ink, a dashed hole for thrown
+words, a squashed glyph for stomped ones), so the text never reflows under the player's cursor.
 
-All art (spider, effects, logo, icons, favicon) is drawn in code; there are no image assets.
-`prefers-reduced-motion` shortens the transitions.
+### The spider (`src/spider/rig.ts`, `actor.ts`, `runner.ts`)
+
+The rig follows the mockups' rig sheet: a plain outlined body with one red eye, eight 1.5 px legs
+placed by two-bone inverse kinematics, feet that snap to words (each planted foot boxes its word in
+cyan) and re-plant past 90 % stretch in a strict tetrapod gait. One hop is:
+
+1. **scan**: rays from the eye to every visible link while the brain decides; the SPIDER.BRAIN panel
+   shows the best scores;
+2. **crawl & eat**: the eye laser locks the link (slicing words on the way), then the spider walks
+   over the text to it, eating every word under its jaws, or **web-zips** to far links; on the way it
+   randomly lasers a word in half, plucks one and throws it off the page (`yeet()`), or stomps one
+   flat (`THUD`);
+3. **grab**: the legs wrap the link, the link lights up and the pane edges glitch;
+4. **hop**: it dives in, the page glitches out in RGB-split slices, the next article glitches in,
+   and the spider drops in on its silk thread.
+
+The runner plays the agent's decisions with these moves and prefetches the next page while the spider
+crawls. Attacks (`src/attacks/`) are small coroutines picked by a director with cooldowns, chains and
+rage; the link snatch interrupts the hop loop.
+
+All art (spider, effects, illustrations, logo, favicon) is drawn in code; there are no image assets
+and no bundled fonts (the mockups' fonts, Space Grotesk, Source Serif 4 and JetBrains Mono, are used
+when installed, with close system fallbacks otherwise).
 
 ## Run it locally
 
@@ -122,14 +153,17 @@ Source: GitHub Actions**.
 src/
   main.ts                 entry point, screen switching
   config.ts               URLs, user agent, request limits
+  settings.ts             Reduce motion, Hard-mode wins (localStorage, guarded)
   wiki/                   HTTP queue, API client, sanitizer, article cache, titles
-  game/                   race rules, clock, difficulty levels, pair selection
+  game/                   race rules (penalties, photo finish), clock, difficulty table,
+                          pair selection, taunts and roasts
   spider/ai/              decision rules, rankers, embeddings worker, agent (pure, tested)
-  spider/render/          overlay canvas, crawler (IK legs), effects, warp, walk planning
-  spider/spiderPane.ts    the spider's half of the screen (animation coroutines)
-  spider/spiderRunner.ts  plays the agent's decisions on the pane
-  ui/                     setup screen, race screen, end card, article view, logo, widgets
-  styles/                 chrome, article typography, screens
+  spider/                 rig (IK body), actor (moves), runner (hop loop), route, world
+  stage/                  full-window stage, role-agnostic panes, word index, virtual cursor
+  attacks/                web, laser, bombardment, decoys, blackout, harassment, eggs, director
+  fx/                     line-art effects, RGB-split glitches, speech bubble
+  ui/                     title (demo, illustrations), race, finish screens, widgets
+  styles/                 design tokens, article typography, screens
 tests/                    unit and integration tests, fake Wikipedia + demo world
 scripts/generate-icons.mjs
 ```

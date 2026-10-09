@@ -6,7 +6,7 @@
  * towards it, eating every word its mouth passes over, and stops with its
  * mouth at the link.
  */
-import type { Box, Point } from './canvas';
+import type { Box, Point } from '../stage/stage';
 
 export type { Point };
 
@@ -63,11 +63,6 @@ export function planWalk(link: Box, before: readonly Box[], after: readonly Box[
     // Walking leftwards, the farthest word is met first.
     eats: eaten.map((box, i) => ({ side: 'after' as const, index: i, atX: centerX(box) })).reverse(),
   };
-}
-
-/** True when going from `a` to `b` means leaving the current line (abseil on silk). */
-export function crossesLines(a: Point, b: Point, lineHeight: number): boolean {
-  return Math.abs(b.y - a.y) > lineHeight * 0.75;
 }
 
 /** Splits words into those on the link's line, left and right of it. */

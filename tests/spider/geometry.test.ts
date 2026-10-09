@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { Box } from '../../src/spider/render/canvas';
-import { solveKnee } from '../../src/spider/render/crawler';
-import { cameraTarget, crossesLines, planWalk, wordsAroundLink } from '../../src/spider/render/route';
+import type { Box } from '../../src/stage/stage';
+import { segmentHitsBox } from '../../src/spider/actor';
+import { solveKnee } from '../../src/spider/rig';
+import { cameraTarget, planWalk, wordsAroundLink } from '../../src/spider/route';
 
 const box = (left: number, top: number, right: number, bottom = top + 20): Box => ({ left, top, right, bottom });
 
@@ -54,12 +55,7 @@ describe('planWalk', () => {
   });
 });
 
-describe('crossesLines and cameraTarget', () => {
-  it('detects line changes', () => {
-    expect(crossesLines({ x: 0, y: 100 }, { x: 300, y: 104 }, 24)).toBe(false);
-    expect(crossesLines({ x: 0, y: 100 }, { x: 0, y: 130 }, 24)).toBe(true);
-  });
-
+describe('cameraTarget', () => {
   it('keeps the camera inside the content', () => {
     expect(cameraTarget(50, 800, 5000)).toBe(0);
     expect(cameraTarget(2000, 800, 5000)).toBeCloseTo(2000 - 800 * 0.42);
@@ -86,5 +82,19 @@ describe('solveKnee (two-bone IK)', () => {
   it('stretches straight towards an unreachable foot', () => {
     const knee = solveKnee(hip, { x: 200, y: 0 }, 40, 40, { x: 0, y: 10 });
     expect(knee).toEqual({ x: 40, y: 0 });
+  });
+});
+
+describe('segmentHitsBox (eye laser cuts)', () => {
+  const word = { left: 100, top: 100, right: 140, bottom: 120 };
+
+  it('hits words crossed by the beam', () => {
+    expect(segmentHitsBox({ x: 0, y: 0 }, { x: 200, y: 220 }, word)).toBe(true);
+    expect(segmentHitsBox({ x: 120, y: 0 }, { x: 120, y: 300 }, word)).toBe(true);
+  });
+
+  it('misses words beside the beam or beyond its end', () => {
+    expect(segmentHitsBox({ x: 0, y: 0 }, { x: 300, y: 0 }, word)).toBe(false);
+    expect(segmentHitsBox({ x: 0, y: 0 }, { x: 80, y: 90 }, word)).toBe(false);
   });
 });

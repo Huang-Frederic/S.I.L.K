@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { RaceClock } from '../src/game/clock';
+import { DIFFICULTIES, type DifficultyId } from '../src/game/difficulty';
 import { Race } from '../src/game/race';
-import { headline } from '../src/ui/endScreen';
+import { outcome, pathsText } from '../src/ui/finishScreen';
+import type { RaceResult } from '../src/ui/raceScreen';
 
 function setup() {
   let now = 0;
@@ -9,6 +11,20 @@ function setup() {
   const race = new Race('Moth Orchard', 'Tidewatch Observatory', clock);
   clock.start();
   return { race, clock, advance: (ms: number) => (now += ms) };
+}
+
+function result(race: Race, difficulty: DifficultyId, extra: Partial<RaceResult> = {}): RaceResult {
+  return {
+    race,
+    difficulty: DIFFICULTIES[difficulty],
+    pair: {} as RaceResult['pair'],
+    wordsEaten: 2318,
+    spiderOneAway: false,
+    gaveUp: false,
+    photoFinish: false,
+    hardWins: 0,
+    ...extra,
+  };
 }
 
 describe('RaceClock', () => {
@@ -71,34 +87,128 @@ describe('Race', () => {
     race.move('player', 'Tidewatch Observatory');
     expect(race.winner).toBe('player');
   });
+
+  it('swaps panes without counting a hop', () => {
+    const { race, advance } = setup();
+    advance(500);
+    race.move('player', 'Silk');
+    advance(500);
+    race.move('spider', 'Lantern Festival', 'link', 'semantic');
+    advance(500);
+    // The spider snatches the player's next link; the player inherits the spider's page.
+    race.move('spider', 'Copper Lighthouse', 'link', 'snatch');
+    race.teleport('player', 'Lantern Festival', 'swap');
+    expect(race.player.hops).toBe(1);
+    expect(race.current('player')).toBe('Lantern Festival');
+    expect(race.player.path.at(-1)).toMatchObject({ via: 'swap', title: 'Lantern Festival' });
+    expect(race.spider.hops).toBe(2);
+  });
 });
 
-describe('end card headline', () => {
-  it('describes each outcome', () => {
-    const win = setup();
-    win.advance(5000);
-    win.race.move('player', 'Tidewatch Observatory');
-    win.advance(7000);
-    win.race.move('spider', 'Tidewatch Observatory');
-    expect(headline(win.race)).toMatchObject({ title: 'You win', tone: 'win', detail: 'You reached the target first by 0:07.0.' });
+describe('penalties and photo finish', () => {
+  it('adds penalties to the official time', () => {
+    const { race, advance } = setup();
+    race.penalize('player', 15_000);
+    advance(10_000);
+    expect(race.move('player', 'Tidewatch Observatory')).toBe(true);
+    expect(race.player.arrivedAt).toBe(10_000);
+    expect(race.player.finishedAt).toBe(25_000);
+    // Photo finish: the spider can still win.
+    expect(race.winner).toBeNull();
+    expect(race.photoFinish).toEqual({ who: 'player', until: 25_000 });
+    advance(14_000);
+    expect(race.settle()).toBeNull();
+    advance(1_000);
+    expect(race.settle()).toBe('player');
+    expect(race.photoFinish).toBeNull();
+  });
 
-    const lose = setup();
-    lose.advance(4000);
-    lose.race.move('spider', 'Tidewatch Observatory');
-    expect(headline(lose.race)).toMatchObject({ title: 'The spider wins', tone: 'lose' });
-    lose.advance(400);
-    lose.race.move('player', 'Tidewatch Observatory');
-    expect(headline(lose.race).detail).toBe('You arrived a split second later.');
+  it('lets the spider win a photo finish by arriving first', () => {
+    const { race, advance } = setup();
+    race.penalize('player', 15_000);
+    advance(10_000);
+    race.move('player', 'Tidewatch Observatory');
+    advance(4_000);
+    expect(race.move('spider', 'Tidewatch Observatory')).toBe(true);
+    expect(race.winner).toBe('spider');
+  });
 
+  it('decides a photo finish at once when the spider retires', () => {
+    const { race, advance } = setup();
+    race.penalize('player', 15_000);
+    advance(1_000);
+    race.move('player', 'Tidewatch Observatory');
+    expect(race.winner).toBeNull();
+    race.retire('spider');
+    expect(race.winner).toBe('player');
+  });
+
+  it('ignores penalties after arrival', () => {
+    const { race, advance } = setup();
+    advance(1_000);
+    race.move('player', 'Tidewatch Observatory');
+    race.penalize('player', 15_000);
+    expect(race.player.finishedAt).toBe(1_000);
+    expect(race.winner).toBe('player');
+  });
+});
+
+describe('finish screen verdict', () => {
+  it('describes a win with the hop margin', () => {
+    const { race, advance } = setup();
+    for (const title of ['A', 'B', 'C', 'D', 'E', 'F', 'G']) race.move('spider', title);
+    for (const title of ['Silk', 'Silk Road', 'Printing']) race.move('player', title);
+    advance(178_000);
+    race.move('player', 'Tidewatch Observatory');
+    const verdict = outcome(result(race, 'normal', { spiderOneAway: true }));
+    expect(verdict).toMatchObject({ kind: 'win', title: 'You win.' });
+    expect(verdict.detail).toBe('You beat the spider by 3 hops. It was one link away from the target.');
+  });
+
+  it('shouts IMPOSSIBLE on a Hard win', () => {
+    const { race } = setup();
+    race.move('player', 'Tidewatch Observatory');
+    const verdict = outcome(result(race, 'hard', { hardWins: 1 }));
+    expect(verdict.kind).toBe('impossible');
+    expect(verdict.title).toBe('IMPOSSIBLE.');
+    expect(verdict.tagline).toBe('(screenshot this.)');
+    expect(verdict.detail).toContain('Hard mode wins in this browser: 1.');
+  });
+
+  it('roasts the loser with real numbers', () => {
+    const { race } = setup();
+    race.move('spider', 'Tidewatch Observatory');
+    const verdict = outcome(result(race, 'normal'), () => 0);
+    expect(verdict).toMatchObject({ kind: 'lose', title: 'Spider wins.' });
+    expect(verdict.detail).toBe('The spider ate 2,318 words and your dignity.');
+  });
+
+  it('blames the penalty after a lost photo finish', () => {
+    const { race, advance } = setup();
+    race.penalize('player', 15_000);
+    advance(1_000);
+    race.move('player', 'Tidewatch Observatory');
+    advance(2_000);
+    race.move('spider', 'Tidewatch Observatory');
+    const verdict = outcome(result(race, 'hard', { photoFinish: true }), () => 0.5);
+    expect(verdict.detail).toBe('Photo finish. The +15 s penalty did you in.');
+  });
+
+  it('handles giving up and nobody finishing', () => {
     const quit = setup();
     quit.race.retire('player');
-    expect(headline(quit.race).title).toBe('You gave up');
+    expect(outcome(result(quit.race, 'easy', { gaveUp: true })).kind).toBe('gave-up');
     quit.race.retire('spider');
-    expect(headline(quit.race).title).toBe('Nobody made it');
+    expect(outcome(result(quit.race, 'easy')).kind).toBe('nobody');
+  });
 
-    const stuck = setup();
-    stuck.race.retire('spider');
-    stuck.race.move('player', 'Tidewatch Observatory');
-    expect(headline(stuck.race).detail).toContain('The spider gave up.');
+  it('copies both paths as text', () => {
+    const { race, advance } = setup();
+    advance(65_000);
+    race.move('player', 'Tidewatch Observatory');
+    const text = pathsText(result(race, 'normal'), outcome(result(race, 'normal')));
+    expect(text).toContain('S.I.L.K · Moth Orchard → Tidewatch Observatory · Normal');
+    expect(text).toContain('You (1 hop, 01:05): Moth Orchard → Tidewatch Observatory');
+    expect(text).toContain('Spider (0 hops): Moth Orchard');
   });
 });

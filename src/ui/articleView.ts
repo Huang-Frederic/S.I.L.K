@@ -11,6 +11,8 @@ export interface ArticleViewOptions {
   onLinkClick?: (title: string, anchor: HTMLAnchorElement) => void;
   /** Extra class on the pane body (e.g. to theme the spider's copy). */
   className?: string;
+  /** Render the CC BY-SA footer inside the article (default true). */
+  attribution?: boolean;
 }
 
 export class ArticleView {
@@ -21,7 +23,10 @@ export class ArticleView {
   private readonly overlay: HTMLElement;
   private current: LoadedArticle | null = null;
 
+  private readonly withAttribution: boolean;
+
   constructor(options: ArticleViewOptions = {}) {
+    this.withAttribution = options.attribution ?? true;
     this.scroller = h('div', { class: 'pane-scroll' });
     this.overlay = h('div', { class: 'pane-overlay', attrs: { 'aria-live': 'polite' } });
     this.element = h('div', { class: `pane-body ${options.className ?? ''}` }, this.scroller, this.overlay);
@@ -40,6 +45,12 @@ export class ArticleView {
       // Read-only copy (the spider's): not focusable nor clickable.
       this.scroller.inert = true;
     }
+  }
+
+  /** Lets the reader click and scroll (player) or not (spider's copy). */
+  setInteractive(interactive: boolean): void {
+    this.scroller.inert = !interactive;
+    this.element.classList.toggle('is-readonly', !interactive);
   }
 
   get article(): LoadedArticle | null {
@@ -69,7 +80,7 @@ export class ArticleView {
         ? h('p', { class: 'wiki-disambig-note', text: 'This is a disambiguation page: it lists articles that share a similar title.' })
         : null,
       article.body.cloneNode(true),
-      attribution(loaded.title),
+      this.withAttribution ? attribution(loaded.title) : null,
     );
     this.scroller.replaceChildren(articleEl);
     this.scroller.scrollTop = 0;

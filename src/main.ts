@@ -1,7 +1,7 @@
 /**
  * S.I.L.K (Spider Indexing Links & Knowledge)
  * Entry point: wires the Wikipedia client and the spider's brain, and
- * switches between screens.
+ * switches between the title, race and finish screens.
  */
 import './styles/base.css';
 import './styles/article.css';
@@ -9,12 +9,13 @@ import './styles/screens.css';
 
 import { DEFAULT_DIFFICULTY, DIFFICULTIES, isDifficultyId, type DifficultyId } from './game/difficulty';
 import type { ValidatedPair } from './game/pairs';
+import { settings } from './settings';
 import { LexicalRanker } from './spider/ai/lexical';
 import { FallbackRanker, SemanticRanker } from './spider/ai/semantic';
 import { WorkerEmbedder } from './spider/ai/workerEmbedder';
-import { Logo } from './ui/logo';
-import { RaceScreen } from './ui/raceScreen';
-import { createSetupScreen } from './ui/setupScreen';
+import { createFinishScreen } from './ui/finishScreen';
+import { RaceScreen, type RaceResult } from './ui/raceScreen';
+import { createTitleScreen, type TitleScreen } from './ui/titleScreen';
 import { ArticleStore } from './wiki/articles';
 import { WikiClient } from './wiki/client';
 
@@ -27,56 +28,48 @@ const store = new ArticleStore(client);
 const embedder = new WorkerEmbedder();
 const ranker = new FallbackRanker(new SemanticRanker(embedder), new LexicalRanker());
 embedder.load().catch(() => {
-  // The spider falls back to word matching; its HUD badge says so.
+  // The spider falls back to word matching; its brain panel says so.
 });
 
-const DIFFICULTY_KEY = 'silk.difficulty';
-
-/** Remembered per browser; storage may be unavailable (private mode...). */
-function savedDifficulty(): DifficultyId {
-  try {
-    const value = localStorage.getItem(DIFFICULTY_KEY);
-    return isDifficultyId(value) ? value : DEFAULT_DIFFICULTY;
-  } catch {
-    return DEFAULT_DIFFICULTY;
-  }
-}
-
-function saveDifficulty(id: DifficultyId): void {
-  try {
-    localStorage.setItem(DIFFICULTY_KEY, id);
-  } catch {
-    // Not important.
-  }
-}
-
 let currentRace: RaceScreen | null = null;
+let currentTitle: TitleScreen | null = null;
 let lastPair: ValidatedPair | null = null;
-let difficulty: DifficultyId = savedDifficulty();
+let difficulty: DifficultyId = isDifficultyId(settings.difficulty) ? (settings.difficulty as DifficultyId) : DEFAULT_DIFFICULTY;
 
-function showSetup(): void {
+// Reduce motion is applied as a class so that CSS transitions can follow it.
+const applyMotion = () => document.documentElement.classList.toggle('reduce-motion', settings.reduceMotion);
+settings.onChange(applyMotion);
+applyMotion();
+
+function clear(): void {
   currentRace?.destroy();
   currentRace = null;
-  app.replaceChildren(
-    createSetupScreen({
-      client,
-      initialStart: lastPair?.start.title,
-      initialTarget: lastPair?.target.title,
-      initialDifficulty: difficulty,
-      logo: new Logo().element,
-      onStart: (choice) => {
-        difficulty = choice.difficulty;
-        saveDifficulty(difficulty);
-        startRace(choice.pair);
-      },
-    }),
-  );
-  app.querySelector<HTMLInputElement>('#field-start')?.focus();
+  currentTitle?.destroy();
+  currentTitle = null;
+}
+
+function showTitle(): void {
+  clear();
+  const title = createTitleScreen({
+    client,
+    initialStart: lastPair?.start.title,
+    initialTarget: lastPair?.target.title,
+    initialDifficulty: difficulty,
+    onStart: (choice) => {
+      difficulty = choice.difficulty;
+      settings.difficulty = difficulty;
+      startRace(choice.pair);
+    },
+  });
+  currentTitle = title;
+  app.replaceChildren(title.element);
+  window.scrollTo(0, 0);
+  title.mount();
 }
 
 function startRace(pair: ValidatedPair): void {
+  clear();
   lastPair = pair;
-  currentRace?.destroy();
   const race = new RaceScreen({
     client,
     store,
@@ -84,12 +77,25 @@ function startRace(pair: ValidatedPair): void {
     embedder,
     pair,
     difficulty: DIFFICULTIES[difficulty],
-    onExit: showSetup,
-    onRematch: () => startRace(pair),
+    onExit: showTitle,
+    onFinish: showFinish,
   });
   currentRace = race;
   app.replaceChildren(race.element);
+  window.scrollTo(0, 0);
   void race.begin();
 }
 
-showSetup();
+function showFinish(result: RaceResult): void {
+  clear();
+  app.replaceChildren(
+    createFinishScreen({
+      result,
+      onRematch: () => startRace(result.pair),
+      onNewPair: showTitle,
+    }),
+  );
+  window.scrollTo(0, 0);
+}
+
+showTitle();

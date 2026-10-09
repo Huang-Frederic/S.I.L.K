@@ -4,9 +4,15 @@
  */
 import { h } from './dom';
 
+/** A suggestion: a title, with a short description when known. */
+export interface Suggestion {
+  title: string;
+  description?: string;
+}
+
 export interface AutocompleteOptions {
   input: HTMLInputElement;
-  search: (query: string) => Promise<string[]>;
+  search: (query: string) => Promise<Array<string | Suggestion>>;
   onSelect?: (title: string) => void;
   debounceMs?: number;
 }
@@ -15,7 +21,7 @@ let nextId = 0;
 
 export class Autocomplete {
   readonly list: HTMLUListElement;
-  private items: string[] = [];
+  private items: Suggestion[] = [];
   private active = -1;
   private timer: ReturnType<typeof setTimeout> | undefined;
   /** Incremented on every query so that late responses can be ignored. */
@@ -59,9 +65,9 @@ export class Autocomplete {
 
   private async runSearch(query: string): Promise<void> {
     const ticket = ++this.sequence;
-    let results: string[];
+    let results: Suggestion[];
     try {
-      results = await this.options.search(query);
+      results = (await this.options.search(query)).map((r) => (typeof r === 'string' ? { title: r } : r));
     } catch {
       results = [];
     }
@@ -70,17 +76,21 @@ export class Autocomplete {
     this.open(results);
   }
 
-  private open(results: string[]): void {
+  private open(results: Suggestion[]): void {
     this.items = results;
     this.active = -1;
     this.list.replaceChildren(
-      ...results.map((title, index) =>
-        h('li', {
-          class: 'ac-option',
-          text: title,
-          attrs: { role: 'option', id: `${this.list.id}-${index}`, 'aria-selected': 'false' },
-          dataset: { index: String(index) },
-        }),
+      ...results.map((item, index) =>
+        h(
+          'li',
+          {
+            class: 'ac-option',
+            attrs: { role: 'option', id: `${this.list.id}-${index}`, 'aria-selected': 'false' },
+            dataset: { index: String(index) },
+          },
+          h('span', { class: 'ac-title', text: item.title }),
+          item.description ? h('span', { class: 'ac-desc', text: item.description }) : null,
+        ),
       ),
     );
     const visible = results.length > 0;
@@ -134,7 +144,7 @@ export class Autocomplete {
   }
 
   private choose(index: number): void {
-    const title = this.items[index];
+    const title = this.items[index]?.title;
     if (title === undefined) return;
     this.options.input.value = title;
     this.sequence++;

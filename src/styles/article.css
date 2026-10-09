@@ -1,53 +1,59 @@
 /* ------------------------------------------------------------------------
- * Wikipedia-like typography for sanitized articles, in a dark theme.
- * Everything is scoped under .wiki-article so the game chrome is unaffected.
+ * Wikipedia articles inside the panes (mockup "Race mid-game"): serif text,
+ * blue underlined links, plus every state the spider can leave a word or a
+ * link in. Scoped under .wiki-article so the game chrome is unaffected.
  * --------------------------------------------------------------------- */
 
 .wiki-article {
-  --wiki-ink: #d8dee6;
+  --wiki-ink: #dfe3e8;
   --wiki-strong: #f4f7fa;
-  --wiki-muted: #8e99a6;
-  --wiki-rule: #2a323d;
-  --wiki-link: #7aa2ff;
-  --wiki-box: #0b0f14;
-  --wiki-box-head: #121821;
-  max-width: 48rem;
+  --wiki-muted: #989fa7;
+  --wiki-rule: #2e3640;
+  --wiki-link: #88a3e8;
+  --wiki-box: #0d1115;
+  --wiki-box-head: #161c23;
+  max-width: 46rem;
   margin: 0 auto;
-  padding: 24px 30px 56px;
+  padding: 34px clamp(18px, 5cqi, 48px) 64px;
   color: var(--wiki-ink);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Lato, 'Helvetica Neue', Arial, sans-serif;
-  font-size: 16px;
-  line-height: 1.62;
+  font-family: var(--font-serif);
+  font-size: 19px;
+  line-height: 1.72;
   overflow-wrap: break-word;
 }
 
 .wiki-title {
   margin: 0 0 4px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--wiki-rule);
   color: var(--wiki-strong);
-  font-family: 'Linux Libertine', 'Georgia', 'Times New Roman', serif;
-  font-size: 1.95rem;
-  font-weight: normal;
-  line-height: 1.3;
+  font-family: var(--font-serif);
+  font-size: 2.05em;
+  font-weight: 500;
+  line-height: 1.2;
 }
 
 .wiki-subtitle,
 .wiki-redirect-note,
 .wiki-disambig-note {
-  margin: 0 0 14px;
+  margin: 0 0 16px;
   color: var(--wiki-muted);
-  font-size: 0.82rem;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.wiki-subtitle {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--wiki-rule);
 }
 
 .wiki-redirect-note {
-  margin-top: -10px;
+  margin-top: -8px;
 }
 
 .wiki-disambig-note {
-  padding: 6px 10px;
-  border-left: 3px solid #ffcc4d;
-  background: rgba(255, 204, 77, 0.07);
+  padding: 8px 12px;
+  border-left: 2px solid var(--amber);
+  background: rgba(255, 181, 71, 0.07);
   color: var(--wiki-ink);
 }
 
@@ -56,32 +62,32 @@
 .wiki-body h4,
 .wiki-body h5,
 .wiki-body h6 {
-  margin: 1.2em 0 0.35em;
+  margin: 1.3em 0 0.4em;
   color: var(--wiki-strong);
-  line-height: 1.35;
+  font-family: var(--font-serif);
+  font-weight: 500;
+  line-height: 1.3;
 }
 
 .wiki-body h2 {
   margin-top: 1.5em;
-  padding-bottom: 3px;
+  padding-bottom: 6px;
   border-bottom: 1px solid var(--wiki-rule);
-  font-family: 'Linux Libertine', 'Georgia', 'Times New Roman', serif;
-  font-size: 1.5rem;
-  font-weight: normal;
+  font-size: 1.45em;
 }
 
 .wiki-body h3 {
-  font-size: 1.2rem;
+  font-size: 1.2em;
 }
 
 .wiki-body h4,
 .wiki-body h5,
 .wiki-body h6 {
-  font-size: 1rem;
+  font-size: 1em;
 }
 
 .wiki-body p {
-  margin: 0.5em 0 0.95em;
+  margin: 0.4em 0 1em;
 }
 
 .wiki-body b,
@@ -91,7 +97,7 @@
 
 .wiki-body ul,
 .wiki-body ol {
-  margin: 0.3em 0 0.6em 1.6em;
+  margin: 0.3em 0 0.7em 1.5em;
   padding: 0;
 }
 
@@ -108,7 +114,7 @@
 }
 
 .wiki-body dl {
-  margin: 0.3em 0 0.6em;
+  margin: 0.3em 0 0.7em;
 }
 
 .wiki-body dt {
@@ -122,13 +128,13 @@
 .wiki-body blockquote {
   margin: 1em 0;
   padding: 0 1.4em;
-  border-left: 3px solid var(--wiki-rule);
+  border-left: 2px solid var(--wiki-rule);
 }
 
 .wiki-body pre,
 .wiki-body code {
-  font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 0.88em;
+  font-family: var(--font-mono);
+  font-size: 0.82em;
   background: var(--wiki-box);
 }
 
@@ -141,7 +147,6 @@
 
 .wiki-body code {
   padding: 1px 4px;
-  border-radius: 2px;
 }
 
 .wiki-body sup,
@@ -154,30 +159,30 @@
   border-top: 1px solid var(--wiki-rule);
 }
 
-/* Links */
+/* Links. The hover box is drawn by the game (it follows the game's cursor). */
 .wiki-link {
   color: var(--wiki-link);
-  text-decoration: none;
-  border-radius: 2px;
-}
-
-.wiki-link:hover {
-  color: #a9c3ff;
   text-decoration: underline;
-  text-shadow: 0 0 12px rgba(122, 162, 255, 0.55);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  cursor: pointer;
 }
 
 .wiki-link:focus-visible {
-  outline: 1px solid var(--wiki-link);
-  outline-offset: 1px;
+  outline: 1px dashed var(--amber);
+  outline-offset: 3px;
+}
+
+.is-readonly .wiki-link {
+  cursor: default;
 }
 
 /* Hatnotes ("For other uses, see ...") */
 .wiki-hatnote {
   margin-bottom: 0.6em;
-  padding-left: 1.6em;
+  padding-left: 1.4em;
   color: var(--wiki-muted);
-  font-size: 0.94em;
+  font-size: 0.9em;
   font-style: italic;
 }
 
@@ -185,13 +190,14 @@
 .wiki-infobox {
   float: right;
   clear: right;
-  width: 22em;
+  width: 20em;
   margin: 0.3em 0 1em 1.4em;
   padding: 0.2em;
   border: 1px solid var(--wiki-rule);
   border-spacing: 3px;
   background: var(--wiki-box);
-  font-size: 0.86em;
+  font-family: var(--font-ui);
+  font-size: 0.74em;
   line-height: 1.5;
 }
 
@@ -229,7 +235,8 @@
 
 .wiki-body table:not(.wiki-infobox) {
   border-collapse: collapse;
-  font-size: 0.9em;
+  font-family: var(--font-ui);
+  font-size: 0.78em;
 }
 
 .wiki-body table:not(.wiki-infobox) th,
@@ -284,23 +291,97 @@ ul.wiki-plainlist {
   background: var(--wiki-box);
 }
 
-/* Words the spider ate keep their box (so nothing reflows) but lose their ink. */
-.sw-eaten {
-  color: transparent !important;
-  text-shadow: none !important;
-}
-
-/* CC BY-SA attribution */
+/* CC BY-SA attribution (used where an article is shown outside a pane). */
 .wiki-attribution {
   clear: both;
   margin-top: 2.5em;
   padding-top: 0.8em;
   border-top: 1px solid var(--wiki-rule);
   color: var(--wiki-muted);
-  font-size: 0.78rem;
-  line-height: 1.5;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
-.wiki-attribution a {
-  color: var(--wiki-link);
+/* ------------------------------------------------------------------------
+ * What the spider does to words. Destroyed words keep their box, so the
+ * text never reflows under the player's cursor.
+ * --------------------------------------------------------------------- */
+
+/* Eaten (or sliced): dashed laser outline, strike-through, 20 % ink. */
+.sw-eaten {
+  opacity: 0.2;
+  outline: 1px dashed rgba(255, 43, 58, 0.85);
+  outline-offset: 1px;
+  text-decoration: line-through;
+  text-decoration-color: #ff2b3a;
+  text-decoration-thickness: 2px;
+}
+
+/* Thrown away: a dashed hole where the word was. */
+.sw-hole {
+  color: transparent !important;
+  text-decoration: none !important;
+  outline: 1px dashed rgba(79, 216, 232, 0.85);
+  outline-offset: 1px;
+}
+
+/* Stomped: squashed flat. */
+.sw-squashed {
+  display: inline-block;
+  color: #ff2b3a !important;
+  opacity: 0.6;
+  transform: scale(1.22, 0.28);
+  transform-origin: 50% 85%;
+  text-decoration: none !important;
+}
+
+/* ------------------------------------------------------------------------
+ * Links under attack.
+ * --------------------------------------------------------------------- */
+
+.wiki-link.is-damaged {
+  cursor: not-allowed;
+}
+
+/* Under a web: dimmed (the web itself is drawn on top). */
+.wiki-link.is-webbed {
+  opacity: 0.45;
+  text-decoration-style: dotted;
+}
+
+/* Under a thrown word: hidden by the word tag drawn on top. */
+.wiki-link.is-covered {
+  color: transparent;
+  text-decoration-color: transparent;
+}
+
+/* Laser-burned. */
+.wiki-link.is-burned {
+  color: #ff2b3a;
+  opacity: 0.7;
+  outline: 1px dashed rgba(255, 43, 58, 0.9);
+  outline-offset: 2px;
+  text-decoration: line-through;
+  text-decoration-color: #ff2b3a;
+  text-shadow: 0 0 8px rgba(255, 43, 58, 0.75);
+}
+
+/* Eaten (snatched, or by a mini-spider). */
+.wiki-link.is-eaten {
+  opacity: 0.22;
+  outline: 1px dashed rgba(255, 43, 58, 0.85);
+  outline-offset: 1px;
+  text-decoration: line-through;
+  text-decoration-color: #ff2b3a;
+}
+
+/* Wrapped in the spider's legs, about to hop. */
+.wiki-link.is-grabbed {
+  color: var(--line);
+  background: rgba(79, 216, 232, 0.16);
+  outline: 1px solid var(--cyan);
+  outline-offset: 2px;
+  box-shadow: 0 0 16px rgba(79, 216, 232, 0.55);
+  text-decoration-color: var(--cyan);
 }
