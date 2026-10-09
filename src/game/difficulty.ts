@@ -9,9 +9,9 @@
  *    25 s (more often in rage). Hard but winnable.
  *  - Hard: an attack every 4-8 s, chained, with no warning: webs, fan
  *    lasers, word bombs, fake target links full of mini-spiders and, now and
- *    then, a silk line on the cursor. Once a race it steals the link that
- *    would put the player ahead. It runs across the page smashing the text;
- *    rage is always on. Expected win rate: almost zero.
+ *    then, a silk line on the cursor. When the player gets ahead, it steals
+ *    their good links (at most one a minute). It runs across the page
+ *    smashing the text; rage is always on. Expected win rate: almost zero.
  *
  * Attacks never come with a telegraph: they land instantly.
  */
@@ -25,14 +25,12 @@ export type RageRule = 'never' | 'near-target' | 'always';
 
 /**
  * Link snatch: the spider steals the link the player clicks, but only when
- * that link would put the player ahead (see game/snatch.ts).
+ * the player is winning (see game/snatch.ts).
  */
 export interface SnatchRule {
   /** The player's first links are safe: no snatch before this many link hops. */
   safeHops: number;
-  /** Snatches per race. */
-  perRace: number;
-  /** Seconds after the start of the race (or the last snatch) before a snatch. */
+  /** Seconds between two snatches. */
   cooldown: number;
 }
 
@@ -139,7 +137,7 @@ export const DIFFICULTIES: Record<DifficultyId, Difficulty> = {
   hard: {
     id: 'hard',
     label: 'Hard',
-    blurb: 'Everything, every few seconds, no warning. Once a race it steals the link that would put you ahead. Expected win rate: almost zero.',
+    blurb: 'Everything, every few seconds, no warning. Get ahead and it steals your good links. Expected win rate: almost zero.',
     thinkMs: 250,
     walkSpeed: 300,
     sprint: 3,
@@ -152,7 +150,7 @@ export const DIFFICULTIES: Record<DifficultyId, Difficulty> = {
     firstAttack: 3,
     chain: 0.55,
     laserFan: 24,
-    snatch: { safeHops: 3, perRace: 1, cooldown: 60 },
+    snatch: { safeHops: 3, cooldown: 60 },
     rage: 'always',
     webSeconds: 9,
     coverSeconds: 10,

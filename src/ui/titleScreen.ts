@@ -287,7 +287,7 @@ function howItWorks(): HTMLElement {
       level('Hard', 'is-hard', [
         'Near-instant thinking, runs across the page smashing everything, rage always on.',
         'An attack every 4–8 s, chained, no warning: webs, fan lasers, word bombs, fake target links full of mini-spiders, and now and then a silk line on your cursor.',
-        'Once a race, after your first three links, it steals the link that would put you ahead: it leaps across, eats it, dives in, and the panes swap.',
+        'Get ahead and it steals the good link you click (never your first three, never the last two before the target, at most one a minute): it leaps across, eats it, dives in, and the panes swap.',
         'Expected win rate: almost zero.',
       ]),
     ),
