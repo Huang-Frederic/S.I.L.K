@@ -27,7 +27,7 @@ import { Z, type Box, type Drawable, type Point, type Stage } from '../stage/sta
 import { EATEN_CLASS, type Word } from '../stage/wordIndex';
 import type { LoadedArticle } from '../wiki/articles';
 import { OPEN_GROUND, SpiderRig, type Foothold, type Ground } from './rig';
-import { cameraTarget, planWalk, wordsAroundLink } from './route';
+import { approach, cameraTarget, serpentine } from './route';
 
 export class Interrupted extends Error {
   constructor(readonly reason: string) {
@@ -73,6 +73,69 @@ const center = (b: Box): Point => ({ x: (b.left + b.right) / 2, y: (b.top + b.bo
 const distance = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.y - a.y);
 const textOf = (el: Element) => (el.textContent ?? '').replace(/[^\p{L}\p{N}'-]/gu, '').slice(0, 18) || '…';
 const UP: Point = { x: 0, y: -1 };
+/** Distance from the body centre to the mouth (the link is reached mouth first). */
+const MOUTH = 15;
+
+/**
+ * Moves the rig along a path, point after point: it speeds up into a walk
+ * (a run far from the end) and slows down as it gets there.
+ */
+class PathWalk {
+  private next = 0;
+  private speed = 0;
+  /** Length of the path from each point to the end. */
+  private readonly rest: number[];
+
+  constructor(private readonly path: Point[]) {
+    this.rest = new Array<number>(path.length).fill(0);
+    for (let i = path.length - 2; i >= 0; i--) this.rest[i] = this.rest[i + 1] + distance(path[i], path[i + 1]);
+  }
+
+  /** Distance left to walk from `at`. */
+  left(at: Point): number {
+    return this.next < this.path.length ? distance(at, this.path[this.next]) + this.rest[this.next] : 0;
+  }
+
+  /** Stops dead (an attack, a stomp): it will speed up again. */
+  halt(): void {
+    this.speed = 0;
+  }
+
+  /**
+   * One frame of walking at up to `walk` px/s (`sprint` times that far from
+   * the end). Returns the speed, or -1 once at the end of the path.
+   */
+  advance(rig: SpiderRig, dt: number, walk: number, sprint: number): number {
+    const left = this.left(rig);
+    if (left < 0.6) return -1;
+    const cruise = walk * (1 + (sprint - 1) * Math.min(1, left / 1000));
+    this.speed += Math.sign(cruise - this.speed) * Math.min(Math.abs(cruise - this.speed), walk * dt * 6);
+    const v = Math.min(this.speed, Math.max(walk * 0.3, left * 5));
+    let budget = v * dt;
+    let heading: Point | null = null;
+    while (budget > 1e-6 && this.next < this.path.length) {
+      const p = this.path[this.next];
+      const dx = p.x - rig.x;
+      const dy = p.y - rig.y;
+      const d = Math.hypot(dx, dy);
+      if (d > 1e-6) heading = { x: dx, y: dy };
+      if (d <= budget) {
+        rig.x = p.x;
+        rig.y = p.y;
+        budget -= d;
+        this.next++;
+      } else {
+        rig.x += (dx / d) * budget;
+        rig.y += (dy / d) * budget;
+        budget = 0;
+      }
+    }
+    // The eye looks where it is going: it swings with the weave.
+    if (heading) rig.face(heading);
+    rig.lookAt = this.path[Math.min(this.path.length - 1, this.next + 6)];
+    return v;
+  }
+}
 
 export class SpiderActor implements Drawable {
   readonly z = Z.spider;
@@ -92,9 +155,10 @@ export class SpiderActor implements Drawable {
   onEat: ((total: number) => void) | null = null;
 
   private interruptReason: string | null = null;
-  /** Dragline behind the spider (surface coordinates). */
-  private trail: Point[] = [];
+  /** The thread it hangs from while dropping in or climbing out (surface coordinates). */
   private hangFrom: Point | null = null;
+  /** A thread just let go of: it springs back up and vanishes. */
+  private released: { from: Point; to: Point; t: number } | null = null;
   /** The link the spider is heading for: its feet do not crush it. */
   private protectedLink: HTMLAnchorElement | null = null;
   private zipLine: { from: Point; to: Point; t: number } | null = null;
@@ -244,7 +308,6 @@ export class SpiderActor implements Drawable {
     this.rig.x = p.x;
     this.rig.y = p.y;
     this.surface = pane;
-    this.trail = [];
     this.camY = pane.scroller.scrollTop;
   }
 
@@ -256,7 +319,7 @@ export class SpiderActor implements Drawable {
     this.rig.y = p.y;
     this.rig.liftAll();
     this.surface = null;
-    this.trail = [];
+    this.released = null;
   }
 
   // ------------------------------------------------------------------ frame
@@ -267,15 +330,7 @@ export class SpiderActor implements Drawable {
     this.rays = this.rays.filter((r) => r.age < 0.45);
     this.overlays = this.overlays.filter((o) => o.until > this.stage.time);
     this.updateCamera(dt);
-    // Dragline: a point every few pixels while walking.
-    if (this.surface && this.rig.grounded && this.rig.visible) {
-      const last = this.trail[this.trail.length - 1];
-      const here = this.rig.spinneret();
-      if (!last || distance(last, here) > 9) {
-        this.trail.push(here);
-        if (this.trail.length > 70) this.trail.shift();
-      }
-    }
+    if (this.released && (this.released.t += dt / 0.22) >= 1) this.released = null;
   }
 
   private updateCamera(dt: number): void {
@@ -316,9 +371,12 @@ export class SpiderActor implements Drawable {
       ctx.globalAlpha = 1;
     }
 
-    if (rig.visible) {
-      if (this.trail.length > 1) drawSilk(ctx, [...this.trail, rig.spinneret()], 0.4);
-      if (this.hangFrom) drawSilk(ctx, [this.hangFrom, rig.top()], 0.85);
+    if (rig.visible && this.hangFrom) drawSilk(ctx, [this.hangFrom, rig.top()], 0.85);
+    if (this.released) {
+      // The thread springs back up to where it hung from.
+      const { from, to, t } = this.released;
+      const e = 1 - (1 - t) ** 3;
+      drawSilk(ctx, [from, { x: lerp(to.x, from.x, e), y: lerp(to.y, from.y, e) }], 0.85 * (1 - t));
     }
     if (this.zipLine) {
       const { from, to, t } = this.zipLine;
@@ -618,7 +676,7 @@ export class SpiderActor implements Drawable {
   async dropIn(pane: RacerPane): Promise<void> {
     const rig = this.rig;
     this.surface = pane;
-    this.trail = [];
+    this.released = null;
     this.camY = pane.scroller.scrollTop;
     const spot = this.landingSpot(pane);
     const view = pane.visibleContent();
@@ -637,9 +695,10 @@ export class SpiderActor implements Drawable {
     await this.tween(this.d(0.45), (t) => (rig.y = lerp(startY, spot.y, easeOutBack(t))));
     rig.pose = 'stand';
     rig.plantAll(this.ground);
-    await this.tween(this.d(0.14), (t) => (rig.fold = 0.5 * (1 - t)));
-    this.trail = [this.hangFrom, rig.top()];
+    // On its feet, it lets go of the thread.
+    this.released = { from: this.hangFrom, to: rig.top(), t: 0 };
     this.hangFrom = null;
+    await this.tween(this.d(0.14), (t) => (rig.fold = 0.5 * (1 - t)));
   }
 
   private landingSpot(pane: RacerPane): Point {
@@ -676,18 +735,52 @@ export class SpiderActor implements Drawable {
     let next = 0;
     let i = 0;
     const gap = clamp(minSeconds / Math.max(8, links.length), 0.035, 0.14);
+    // A long think: it paces about the page, eating as it goes.
+    let stroll: PathWalk | null = null;
+    let restless = 0.5 + Math.random() * 0.5;
     while (elapsed < minSeconds || !box.done) {
       const dt = await this.frame();
       elapsed += dt;
       next -= dt;
+      if (stroll && this.holds === 0) {
+        const v = stroll.advance(this.rig, dt, this.speeds().walk * 0.55, 1);
+        if (v < 0) {
+          stroll = null;
+          restless = 0.7 + Math.random() * 1.1;
+        } else {
+          this.speedNow = v;
+          this.eatUnderBody(null);
+        }
+      } else if (!stroll && minSeconds - elapsed > 1 && (restless -= dt) <= 0) {
+        stroll = new PathWalk(this.strollPath(pane));
+      }
       if (next <= 0 && links.length) {
         const to = center(links[i++ % links.length].box);
         this.rays.push({ to, age: 0 });
-        this.rig.lookAt = to;
+        if (!stroll) this.rig.lookAt = to;
         next = gap;
       }
     }
+    this.speedNow = 0;
     return this.until(work);
+  }
+
+  /** A short wander somewhere nearby on the visible text. */
+  private strollPath(pane: RacerPane): Point[] {
+    const rig = this.rig;
+    const view = pane.visibleContent();
+    const article = pane.articleBox() ?? view;
+    const left = Math.max(view.left, article.left) + 40;
+    const right = Math.min(view.right, article.right) - 40;
+    const top = Math.max(view.top, article.top) + 60;
+    const bottom = Math.min(view.bottom, article.bottom) - 60;
+    const angle = Math.random() * Math.PI * 2;
+    const reach = 60 + Math.random() * 70;
+    const to = {
+      x: clamp(rig.x + Math.cos(angle) * reach, left, Math.max(left, right)),
+      y: clamp(rig.y + Math.sin(angle) * reach, top, Math.max(top, bottom)),
+    };
+    return serpentine({ x: rig.x, y: rig.y }, to, { side: Math.random() < 0.5 ? 1 : -1 });
   }
 
   /** Score labels next to the shortlisted links; the best one in cyan. */
@@ -737,63 +830,47 @@ export class SpiderActor implements Drawable {
 
   // ------------------------------------------------------- 02 · crawl & eat
 
-  /** Walks (or zips) to the link's line, then eats its way along it to the link. */
+  /**
+   * Weaves its way to the link like a snake (or zips there when it is very
+   * far), then straightens out for a short run along the link's line, from
+   * the side it comes, eating its way up to the link.
+   */
   async crawlTo(anchor: HTMLAnchorElement): Promise<void> {
     const pane = this.surface;
     if (!pane) return;
     this.protectedLink = anchor;
     const box = pane.linkBox(anchor);
-    pane.words.ensure({ left: box.left - 600, right: box.right + 600, top: box.top - 40, bottom: box.bottom + 40 });
-    const near = pane.words.inside({ left: -1e6, right: 1e6, top: box.top - 30, bottom: box.bottom + 30 }, (w) => !w.gone && w.link !== anchor).map((w) => w.box);
-    const { before, after } = wordsAroundLink(box, near);
-    const plan = planWalk(
-      box,
-      before.map((i) => near[i]),
-      after.map((i) => near[i]),
-      15,
-      5,
-    );
     const here = { x: this.rig.x, y: this.rig.y };
-    const onLine = Math.abs(here.y - plan.start.y) < 6 && (plan.direction === 1 ? here.x >= plan.start.x - 4 && here.x <= plan.end.x : here.x <= plan.start.x + 4 && here.x >= plan.end.x);
-    if (!onLine) {
-      if (distance(here, plan.start) > this.speeds().zipBeyond) await this.webZip(plan.start, center(box));
-      else await this.walk(plan.start, anchor, true);
-    }
-    await this.walk(plan.end, anchor, false);
+    const { runIn, end } = approach(box, here, MOUTH);
+    if (distance(here, runIn) > this.speeds().zipBeyond) await this.webZip(runIn, center(box));
+    else if (distance(here, runIn) > 1) await this.walk(serpentine(here, runIn, { side: Math.random() < 0.5 ? 1 : -1 }), anchor, true);
+    await this.walk([end], anchor, false);
   }
 
   /**
-   * Walks in a straight line, eating every word under its body. Far from the
-   * goal it breaks into a run (up to `sprint` times its walking speed) and
-   * slows down again as it gets close.
+   * Walks along a path, eating every word under its body. Far from the end it
+   * breaks into a run (up to `sprint` times its walking speed) and slows
+   * down again as it gets close.
    */
-  private async walk(to: Point, exclude: HTMLAnchorElement | null, mischief: boolean): Promise<void> {
-    const rig = this.rig;
-    let speed = 0;
+  private async walk(path: Point[], exclude: HTMLAnchorElement | null, mischief: boolean): Promise<void> {
+    const route = new PathWalk(path);
     try {
       for (;;) {
         const dt = await this.frame();
         if (this.holds > 0) {
-          speed = 0;
+          route.halt();
           this.speedNow = 0;
           continue;
         }
         const sp = this.speeds();
-        const dx = to.x - rig.x;
-        const dy = to.y - rig.y;
-        const d = Math.hypot(dx, dy);
-        if (d < 0.6) break;
-        const cruise = sp.walk * (1 + (sp.sprint - 1) * Math.min(1, d / 1000));
-        speed += Math.sign(cruise - speed) * Math.min(Math.abs(cruise - speed), sp.walk * dt * 6);
-        const v = Math.min(speed, Math.max(sp.walk * 0.3, d * 5));
-        const stepLength = Math.min(d, v * dt);
-        rig.x += (dx / d) * stepLength;
-        rig.y += (dy / d) * stepLength;
-        rig.face({ x: dx, y: dy });
-        rig.lookAt = to;
+        const v = route.advance(this.rig, dt, sp.walk, sp.sprint);
+        if (v < 0) break;
         this.speedNow = v;
         this.eatUnderBody(exclude);
-        if (mischief && d > 60 && Math.random() < sp.mischief * dt) await this.mischief(exclude);
+        if (mischief && route.left(this.rig) > 60 && Math.random() < sp.mischief * dt) {
+          await this.mischief(exclude);
+          route.halt();
+        }
       }
     } finally {
       this.speedNow = 0;
@@ -825,7 +902,6 @@ export class SpiderActor implements Drawable {
       rig.fold = 0;
     }
     rig.plantAll(this.ground);
-    this.trail = [from, { x: rig.x, y: rig.y + 16 }];
   }
 
   // ---------------------------------------------------------- mischief
@@ -1003,7 +1079,6 @@ export class SpiderActor implements Drawable {
     this.grabbed = null;
     this.protectedLink = null;
     this.stopEdges();
-    this.trail = [];
   }
 
   /**

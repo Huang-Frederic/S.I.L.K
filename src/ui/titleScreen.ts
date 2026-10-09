@@ -261,7 +261,7 @@ function howItWorks(): HTMLElement {
       'div',
       { class: 'how-grid' },
       step('scan', '01', 'scan', 'Lands on a page and fires a ray at every link to score it: direct hit, links back to the target, or closest in meaning.'),
-      step('crawl', '02', 'crawl & eat', 'Walks over the real text toward the link. Each foot grabs a word (cyan box); words under its jaws get struck out and break apart.'),
+      step('crawl', '02', 'crawl & eat', 'Weaves over the real text toward the link like a snake. Each foot grabs a word (cyan box); words under its jaws get struck out and break apart.'),
       step('grab', '03', 'grab', 'Reaches the link and wraps all eight legs around it. The link lights up and the page edges start to glitch.'),
       step('hop', '04', 'hop', 'The old page glitches out in RGB-split slices, the next article loads, and the spider drops in on its silk thread.'),
     ),
