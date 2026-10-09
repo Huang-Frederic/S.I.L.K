@@ -41,6 +41,8 @@ export interface Difficulty {
   zipBeyond: number;
   /** Random destruction moves (laser cut, grab & throw, stomp) per second of crawling. */
   mischief: number;
+  /** Chance that a foot crushes the word it lands on. */
+  crush: number;
   /** Attacks on the player's pane (empty: the spider leaves the player alone). */
   attacks: AttackId[];
   /** Pause between two attacks, in seconds (random in this range). */
@@ -76,6 +78,7 @@ export const DIFFICULTIES: Record<DifficultyId, Difficulty> = {
     zipSpeed: 650,
     zipBeyond: 3600,
     mischief: 0.45,
+    crush: 0.25,
     attacks: [],
     cooldown: [999, 999],
     firstAttack: 999,
@@ -101,6 +104,7 @@ export const DIFFICULTIES: Record<DifficultyId, Difficulty> = {
     zipSpeed: 1100,
     zipBeyond: 4200,
     mischief: 0.75,
+    crush: 0.4,
     attacks: ['web', 'laser', 'bombard'],
     cooldown: [22, 28],
     firstAttack: 14,
@@ -126,6 +130,7 @@ export const DIFFICULTIES: Record<DifficultyId, Difficulty> = {
     zipSpeed: 2300,
     zipBeyond: 5200,
     mischief: 1.1,
+    crush: 0.55,
     attacks: ['web', 'laser', 'bombard', 'decoy', 'eggs', 'blackout', 'harass'],
     cooldown: [4, 8],
     firstAttack: 3,

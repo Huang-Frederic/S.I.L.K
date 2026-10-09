@@ -106,6 +106,7 @@ class Brood {
         const step = Math.min(d, MINI_SPEED * (ctx.difficulty.id === 'hard' ? 1 : 0.7) * dt);
         rig.x += (dx / d) * step;
         rig.y += (dy / d) * step;
+        rig.face({ x: dx, y: dy });
         rig.lookAt = goal;
       }
       rig.update(dt, OPEN_GROUND);

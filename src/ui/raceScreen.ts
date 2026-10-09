@@ -223,6 +223,7 @@ export class RaceScreen {
       zip: d.zipSpeed * k,
       zipBeyond: d.zipBeyond,
       mischief: d.mischief,
+      crush: d.crush,
       pace: d.id === 'hard' ? 1.8 : d.id === 'normal' ? 1.15 : 1,
     };
   }
