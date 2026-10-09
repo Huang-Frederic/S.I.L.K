@@ -279,11 +279,15 @@ function howItWorks(): HTMLElement {
       'div',
       { class: 'how-levels' },
       level('Easy', 'is-easy', ['Slow thinker.', 'Only crawls and eats its own page.', 'Never attacks you.', 'Winnable.']),
-      level('Normal', 'is-normal', ['Web traps, laser snipes, word bombardments.', 'About one attack every 25 s, faster in rage (when your page links to the target).', 'Hard but winnable.']),
+      level('Normal', 'is-normal', [
+        'Web traps, a fan laser that burns every word it sweeps, word bombardments.',
+        'About one attack every 25 s, faster in rage (when your page links to the target).',
+        'Hard but winnable.',
+      ]),
       level('Hard', 'is-hard', [
         'Near-instant thinking, runs across the page smashing everything, rage always on.',
-        'An attack every 4–8 s, chained, no warning: webs, lasers, word bombs, eggs that hatch into link-eating mini-spiders, blackouts, a silk line on your cursor, and fake target links (+15 s each).',
-        'Reach for a link and it leaps across, eats it, dives in, and the panes swap.',
+        'An attack every 4–8 s, chained, no warning: webs, fan lasers, word bombs, fake target links full of mini-spiders, and now and then a silk line on your cursor.',
+        'Once a race, after your first three links, it steals the link that would put you ahead: it leaps across, eats it, dives in, and the panes swap.',
         'Expected win rate: almost zero.',
       ]),
     ),
