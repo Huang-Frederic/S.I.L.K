@@ -1,0 +1,285 @@
+/* ------------------------------------------------------------------------
+ * Wikipedia-like typography for sanitized articles.
+ * Everything is scoped under .wiki-article so the game chrome is unaffected.
+ * --------------------------------------------------------------------- */
+
+.wiki-article {
+  --wiki-ink: #202122;
+  --wiki-muted: #54595d;
+  --wiki-rule: #a2a9b1;
+  --wiki-link: #3366cc;
+  --wiki-box: #f8f9fa;
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 22px 28px 48px;
+  color: var(--wiki-ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Lato, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+  -webkit-font-smoothing: auto;
+}
+
+.wiki-title {
+  margin: 0 0 4px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--wiki-rule);
+  font-family: 'Linux Libertine', 'Georgia', 'Times New Roman', serif;
+  font-size: 1.9rem;
+  font-weight: normal;
+  line-height: 1.3;
+}
+
+.wiki-subtitle,
+.wiki-redirect-note,
+.wiki-disambig-note {
+  margin: 0 0 14px;
+  color: var(--wiki-muted);
+  font-size: 0.82rem;
+}
+
+.wiki-redirect-note {
+  margin-top: -10px;
+}
+
+.wiki-disambig-note {
+  padding: 6px 10px;
+  background: #fef6e7;
+  border-left: 4px solid #edab00;
+  color: var(--wiki-ink);
+}
+
+.wiki-body h2,
+.wiki-body h3,
+.wiki-body h4,
+.wiki-body h5,
+.wiki-body h6 {
+  margin: 1.2em 0 0.35em;
+  color: #000;
+  line-height: 1.35;
+}
+
+.wiki-body h2 {
+  margin-top: 1.4em;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--wiki-rule);
+  font-family: 'Linux Libertine', 'Georgia', 'Times New Roman', serif;
+  font-size: 1.5rem;
+  font-weight: normal;
+}
+
+.wiki-body h3 {
+  font-size: 1.2rem;
+}
+
+.wiki-body h4,
+.wiki-body h5,
+.wiki-body h6 {
+  font-size: 1rem;
+}
+
+.wiki-body p {
+  margin: 0.5em 0 0.9em;
+}
+
+.wiki-body ul,
+.wiki-body ol {
+  margin: 0.3em 0 0.6em 1.6em;
+  padding: 0;
+}
+
+.wiki-body ul {
+  list-style-type: square;
+}
+
+.wiki-body li {
+  margin-bottom: 0.15em;
+}
+
+.wiki-body dl {
+  margin: 0.3em 0 0.6em;
+}
+
+.wiki-body dt {
+  font-weight: bold;
+}
+
+.wiki-body dd {
+  margin: 0 0 0.2em 1.6em;
+}
+
+.wiki-body blockquote {
+  margin: 1em 0;
+  padding: 0 1.4em;
+  border-left: 4px solid #eaecf0;
+}
+
+.wiki-body pre,
+.wiki-body code {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  background: var(--wiki-box);
+}
+
+.wiki-body pre {
+  padding: 0.8em 1em;
+  overflow-x: auto;
+  border: 1px solid #eaecf0;
+  white-space: pre-wrap;
+}
+
+.wiki-body code {
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.wiki-body sup,
+.wiki-body sub {
+  line-height: 1;
+}
+
+.wiki-body hr {
+  border: 0;
+  border-top: 1px solid var(--wiki-rule);
+}
+
+/* Links */
+.wiki-link {
+  color: var(--wiki-link);
+  text-decoration: none;
+  border-radius: 2px;
+}
+
+.wiki-link:hover {
+  text-decoration: underline;
+}
+
+.wiki-link:focus-visible {
+  outline: 2px solid var(--wiki-link);
+  outline-offset: 1px;
+}
+
+/* Hatnotes ("For other uses, see ...") */
+.wiki-hatnote {
+  margin-bottom: 0.6em;
+  padding-left: 1.6em;
+  font-size: 0.94em;
+  font-style: italic;
+  color: var(--wiki-muted);
+}
+
+/* Infoboxes */
+.wiki-infobox {
+  float: right;
+  clear: right;
+  width: 22em;
+  margin: 0.3em 0 1em 1.4em;
+  padding: 0.2em;
+  border: 1px solid var(--wiki-rule);
+  border-spacing: 3px;
+  background: var(--wiki-box);
+  font-size: 0.86em;
+  line-height: 1.5;
+}
+
+.wiki-infobox th,
+.wiki-infobox td {
+  padding: 0.15em 0.4em;
+  vertical-align: top;
+  text-align: left;
+}
+
+.wiki-infobox th[colspan] {
+  text-align: center;
+  background: #eaecf0;
+}
+
+.wiki-infobox-above {
+  font-size: 1.2em;
+}
+
+@container pane (max-width: 620px) {
+  .wiki-infobox {
+    float: none;
+    width: 100%;
+    margin: 0.3em 0 1em;
+  }
+}
+
+/* Tables */
+.wiki-table-wrap {
+  max-width: 100%;
+  margin: 1em 0;
+  overflow-x: auto;
+}
+
+.wiki-body table:not(.wiki-infobox) {
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.wiki-body table:not(.wiki-infobox) th,
+.wiki-body table:not(.wiki-infobox) td {
+  padding: 0.25em 0.5em;
+  border: 1px solid var(--wiki-rule);
+  vertical-align: top;
+}
+
+.wiki-body table:not(.wiki-infobox) th {
+  background: #eaecf0;
+}
+
+.wiki-wikitable {
+  background: var(--wiki-box);
+}
+
+.wiki-body caption {
+  font-weight: bold;
+  padding: 0.3em;
+}
+
+/* Horizontal lists (inside infoboxes) */
+.wiki-hlist ul,
+ul.wiki-hlist {
+  margin: 0;
+  list-style: none;
+}
+
+.wiki-hlist li,
+ul.wiki-hlist li {
+  display: inline;
+}
+
+.wiki-hlist li:not(:last-child)::after,
+ul.wiki-hlist li:not(:last-child)::after {
+  content: ' · ';
+  font-weight: bold;
+}
+
+.wiki-plainlist ul,
+ul.wiki-plainlist {
+  margin-left: 0;
+  list-style: none;
+}
+
+.wiki-quotebox {
+  margin: 0.5em 0 0.8em;
+  padding: 0.6em 1em;
+  border: 1px solid #c8ccd1;
+  background: var(--wiki-box);
+}
+
+/* CC BY-SA attribution */
+.wiki-attribution {
+  clear: both;
+  margin-top: 2.5em;
+  padding-top: 0.8em;
+  border-top: 1px solid #c8ccd1;
+  color: var(--wiki-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.wiki-attribution a {
+  color: var(--wiki-link);
+}

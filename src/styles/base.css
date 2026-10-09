@@ -1,0 +1,380 @@
+/* ------------------------------------------------------------------------
+ * S.I.L.K: game chrome (dark, chunky, pixel-flavoured UI).
+ * Article typography lives in article.css.
+ * --------------------------------------------------------------------- */
+
+:root {
+  --bg: #120e18;
+  --bg-2: #1a1422;
+  --panel: #211a2c;
+  --panel-2: #2b2238;
+  --edge: #07050b;
+  --ink: #f3efe6;
+  --muted: #a99fbb;
+  --dim: #6f6583;
+  --accent: #5ef2c8;
+  --accent-ink: #0d2a24;
+  --spider: #ff5d8f;
+  --spider-ink: #3a0b1d;
+  --warn: #ffcc4d;
+  --danger: #ff6b5e;
+  --paper: #fbfaf7;
+  --font-ui: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --pixel-edge: 0 0 0 3px var(--edge);
+  --pixel-drop: 6px 6px 0 0 rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background-color: var(--bg);
+  /* A faint pixel grid, like graph paper for spiders. */
+  background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1.5px);
+  background-size: 16px 16px;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  height: 100%;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+a {
+  color: var(--accent);
+}
+
+:focus-visible {
+  outline: 3px solid var(--warn);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.btn {
+  --btn-bg: var(--accent);
+  --btn-ink: var(--accent-ink);
+  appearance: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0.7em 1.15em;
+  background: var(--btn-bg);
+  color: var(--btn-ink);
+  font: 700 0.9rem/1 var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow:
+    inset -3px -3px 0 0 rgba(0, 0, 0, 0.3),
+    inset 3px 3px 0 0 rgba(255, 255, 255, 0.35),
+    var(--pixel-edge);
+  transition: filter 0.1s;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  filter: brightness(1.08);
+}
+
+.btn:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 3px 3px 0 0 rgba(0, 0, 0, 0.3),
+    var(--pixel-edge);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.8) brightness(0.7);
+  transform: none;
+}
+
+.btn-secondary {
+  --btn-bg: var(--panel-2);
+  --btn-ink: var(--ink);
+}
+
+.btn-danger {
+  --btn-bg: var(--danger);
+  --btn-ink: #2a0805;
+}
+
+.btn-spider {
+  --btn-bg: var(--spider);
+  --btn-ink: var(--spider-ink);
+}
+
+.btn-small {
+  padding: 0.5em 0.8em;
+  font-size: 0.75rem;
+}
+
+.btn-icon {
+  padding: 0.55em 0.7em;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* ------------------------------------------------------------- generic UI */
+
+.panel {
+  background: var(--panel);
+  box-shadow: var(--pixel-edge), var(--pixel-drop);
+}
+
+.label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.field {
+  position: relative;
+}
+
+.field-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.7em 0.8em;
+  border: 0;
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 1rem/1.2 var(--font-ui);
+  box-shadow: inset 3px 3px 0 0 rgba(0, 0, 0, 0.5), var(--pixel-edge);
+}
+
+.input::placeholder {
+  color: var(--dim);
+}
+
+.field-error {
+  margin: 6px 0 0;
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+
+.ac-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 16rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--panel-2);
+  box-shadow: var(--pixel-edge), var(--pixel-drop);
+}
+
+.ac-option {
+  padding: 0.45em 0.8em;
+  cursor: pointer;
+}
+
+.ac-option:hover,
+.ac-option.is-active {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* Three pixel blocks filling up one after the other. */
+.loader {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: 24px;
+  background: currentColor;
+  box-shadow:
+    12px 0 0 currentColor,
+    24px 0 0 currentColor;
+  animation: loader 0.9s steps(1) infinite;
+}
+
+@keyframes loader {
+  0% {
+    box-shadow:
+      12px 0 0 transparent,
+      24px 0 0 transparent;
+  }
+  33% {
+    box-shadow:
+      12px 0 0 currentColor,
+      24px 0 0 transparent;
+  }
+  66% {
+    box-shadow:
+      12px 0 0 currentColor,
+      24px 0 0 currentColor;
+  }
+}
+
+/* ---------------------------------------------------------------- screens */
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ------------------------------------------------------------------ panes */
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  box-shadow: var(--pixel-edge), var(--pixel-drop);
+  background: var(--panel);
+}
+
+.pane-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 10px;
+  background: var(--panel-2);
+  font-size: 0.8rem;
+}
+
+.pane-who {
+  padding: 0.25em 0.55em;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.pane-spider .pane-who {
+  background: var(--spider);
+  color: var(--spider-ink);
+}
+
+.pane-stat {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.pane-stat strong {
+  color: var(--ink);
+}
+
+.pane-where {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pane-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.pane-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  container: pane / inline-size;
+}
+
+.pane-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  pointer-events: none;
+}
+
+.pane-overlay:empty {
+  display: none;
+}
+
+.pane-body.is-busy .pane-scroll {
+  opacity: 0.35;
+  filter: grayscale(0.6);
+  transition: opacity 0.15s;
+}
+
+.pane-message {
+  max-width: 28rem;
+  padding: 14px 18px;
+  background: var(--panel);
+  color: var(--ink);
+  text-align: center;
+  box-shadow: var(--pixel-edge), var(--pixel-drop);
+  pointer-events: auto;
+}
+
+.pane-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--accent);
+}
+
+.pane-loading span:last-child {
+  color: var(--ink);
+}
+
+.pane-error p {
+  margin: 0 0 12px;
+}
+
+.pane-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.pane-actions:empty {
+  display: none;
+}

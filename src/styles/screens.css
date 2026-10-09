@@ -1,0 +1,200 @@
+/* ------------------------------------------------------------------------
+ * Screen layouts: setup (title) screen and race screen.
+ * --------------------------------------------------------------------- */
+
+/* ------------------------------------------------------------ setup screen */
+
+.screen-setup {
+  overflow-y: auto;
+}
+
+.setup-inner {
+  width: min(560px, 100% - 32px);
+  margin: auto;
+  padding: 40px 0 56px;
+}
+
+.setup-header {
+  margin-bottom: 18px;
+  text-align: center;
+}
+
+.setup-logo-text {
+  margin: 0;
+  color: var(--accent);
+  font-size: clamp(2.6rem, 9vw, 4.2rem);
+  letter-spacing: 0.12em;
+  text-shadow: 4px 4px 0 var(--edge);
+}
+
+.setup-subtitle {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.setup-pitch {
+  margin: 0 0 22px;
+  color: var(--ink);
+  text-align: center;
+}
+
+.setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px;
+}
+
+.field-input {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.setup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+/* ------------------------------------------------------------- race screen */
+
+.screen-race {
+  position: relative;
+}
+
+.hud {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: var(--bg-2);
+  box-shadow: 0 3px 0 0 var(--edge);
+  z-index: 2;
+}
+
+.hud-target {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hud-target-title {
+  overflow: hidden;
+  color: var(--warn);
+  font-size: 1.05rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-target-desc {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-clock {
+  padding: 4px 12px;
+  background: var(--edge);
+  color: var(--accent);
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.hud-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.race-panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+}
+
+.pane-player.is-locked .pane-scroll {
+  cursor: default;
+}
+
+.race-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(10, 7, 14, 0.55);
+}
+
+.countdown {
+  color: var(--warn);
+  font-size: clamp(4rem, 18vw, 9rem);
+  font-weight: 700;
+  text-shadow: 6px 6px 0 var(--edge);
+  animation: pop 0.35s steps(4) both;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.result-card {
+  width: min(520px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 22px;
+}
+
+.result-title {
+  margin: 0 0 4px;
+  color: var(--accent);
+  font-size: 1.6rem;
+}
+
+.result-summary {
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+
+.result-path {
+  margin: 0 0 18px;
+  padding-left: 1.8em;
+}
+
+.result-path a {
+  color: var(--ink);
+}
+
+.result-back {
+  color: var(--dim);
+}
+
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 14px;
+}
