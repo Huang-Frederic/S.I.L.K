@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Box } from '../../src/spider/render/canvas';
-import { solveKnee } from '../../src/spider/render/crawler';
-import { cameraTarget, crossesLines, planWalk, wordsAroundLink } from '../../src/spider/render/route';
+import type { Box } from '../../src/stage/stage';
+import { solveKnee } from '../../src/spider/rig';
+import { cameraTarget, crossesLines, planWalk, wordsAroundLink } from '../../src/spider/route';
 
 const box = (left: number, top: number, right: number, bottom = top + 20): Box => ({ left, top, right, bottom });
 

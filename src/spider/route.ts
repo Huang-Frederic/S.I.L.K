@@ -6,7 +6,7 @@
  * towards it, eating every word its mouth passes over, and stops with its
  * mouth at the link.
  */
-import type { Box, Point } from './canvas';
+import type { Box, Point } from '../stage/stage';
 
 export type { Point };
 

@@ -67,6 +67,7 @@ export interface RandomArticle {
 // Minimal shapes of the Action API responses we read (formatversion=2).
 interface ApiPage {
   title: string;
+  index?: number;
   ns?: number;
   missing?: boolean;
   invalid?: boolean;
@@ -259,6 +260,30 @@ export class WikiClient {
       { maxRetries: 0 }, // a stale suggestion is not worth waiting for
     );
     return Array.isArray(data?.[1]) ? data[1] : [];
+  }
+
+  /** Title suggestions with their short descriptions (autocomplete). */
+  async searchPages(prefix: string, limit = 6): Promise<Array<{ title: string; description: string }>> {
+    const trimmed = prefix.trim();
+    if (!trimmed) return [];
+    const data = await this.http.getJson<ApiQueryResponse>(
+      this.apiUrl({
+        action: 'query',
+        generator: 'prefixsearch',
+        gpssearch: trimmed,
+        gpslimit: String(limit),
+        gpsnamespace: '0',
+        prop: 'description',
+        redirects: '1',
+      }),
+      { maxRetries: 0 }, // a stale suggestion is not worth waiting for
+    );
+    const seen = new Set<string>();
+    return (data.query?.pages ?? [])
+      .filter((p) => !p.missing && !p.invalid)
+      .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+      .filter((p) => !seen.has(p.title) && seen.add(p.title))
+      .map((p) => ({ title: p.title, description: p.description ?? '' }));
   }
 
   /** A handful of random articles with their size (never cached). */

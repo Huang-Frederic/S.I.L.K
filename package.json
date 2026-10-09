@@ -2,7 +2,7 @@
   "name": "silk",
   "private": true,
   "version": "0.1.0",
-  "description": "S.I.L.K (Spider Indexing Links & Knowledge): race a pixel-art AI spider across English Wikipedia.",
+  "description": "S.I.L.K (Spider Indexing Links & Knowledge): race an AI web-crawler spider across English Wikipedia.",
   "type": "module",
   "scripts": {
     "dev": "vite",
