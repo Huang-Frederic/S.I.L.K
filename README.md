@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/screenshots/logo.png" alt="S.I.L.K logo" width="140" />
+<img src="SHOWCASE/media/logo.png" alt="S.I.L.K logo" width="140" />
 
 # S.I.L.K
 
@@ -34,14 +34,14 @@ That's why I built **S.I.L.K** — *Spider Indexing Links & Knowledge*. Solo, in
 
 ## 🎬 See it in action
 
-A whole race on Hard, condensed: two pages, the countdown, the spider's first moves and first hop, then its victory dance.
+A tour of the game: the home page from top to bottom, then a race on Hard, condensed: the spider at work, its victory dance and the verdict.
 
 <p align="center">
-  <img src="docs/screenshots/quick-overview.gif" alt="S.I.L.K quick overview" width="960" />
-  <br /><sub><em>Pick two pages → countdown → the spider scans, attacks and hops → it reaches the target, eats my badge and dances → the verdict</em></sub>
+  <img src="SHOWCASE/media/quick-overview.gif" alt="S.I.L.K quick overview" width="960" />
+  <br /><sub><em>The home page: how the spider crawls, its moves, the three levels → a race on Hard: the spider scans, attacks and hops → it reaches the target, eats my badge and dances → the verdict</em></sub>
 </p>
 
-Every GIF and screenshot in this README is recorded by a script ([`scripts/showcase/`](scripts/showcase/)) against the *Silken Isles*, the small fictional encyclopedia the tests use, plus the real *Spider* article: the same pages on every run, only the spider's random attacks change.
+Every GIF and screenshot in this README is recorded by a script ([`SHOWCASE/capture/`](SHOWCASE/capture/)) against the *Silken Isles*, the small fictional encyclopedia the tests use, plus the real *Spider* article: the same pages on every run, only the spider's random attacks change.
 
 ---
 
@@ -49,16 +49,16 @@ Every GIF and screenshot in this README is recorded by a script ([`scripts/showc
 
 You pick where you start and where you have to go. The spider gets the same two pages, the same rules and the same clock.
 
-The title screen asks for a **start** and a **target**. Typing suggests real titles with their short descriptions (`generator=prefixsearch`, with `opensearch` as a fallback). The dice pick a genuinely random start: one of 15 random articles that is long enough to race on (at least 6,000 bytes of wikitext) and is neither a list nor a disambiguation page. The random target comes from a pool of about 200 well-known topics per language, so every race is winnable, in theory. Then you choose how mean the spider is (Easy, Normal or Hard), and the countdown starts.
+The title screen asks for a **start** and a **target**. Typing suggests real titles with their short descriptions (`generator=prefixsearch`, with `opensearch` as a fallback). The dice pick a genuinely random start: one of 15 random articles that is long enough to race on (at least 6,000 bytes of wikitext) and is neither a list nor a disambiguation page. The random target comes from a pool of about 200 well-known topics per language, so every race is winnable, in theory. Then you choose how mean the spider is (Easy, Normal or Hard), and the countdown starts. Below the form, the home page explains the opponent with live drawings: how it crawls, its move set, and what each level does.
 
-The race screen is two panes side by side: **yours** on the left (amber, `YOU`), the **spider's** on the right with its `SPIDER.BRAIN` panel. Only links to other articles in the body count; **← back** is allowed but costs a hop. First on the target wins, and the finish screen compares both paths hop by hop, with the time and the number of words the spider ate.
+The race screen is two panes side by side: **yours** on the left (amber, `YOU`), the **spider's** on the right with its `SPIDER.BRAIN` panel. Only links to other articles in the body count; **← back** is allowed but costs a hop, and hovering a link tells you which hop it would be. First on the target wins, and the finish screen compares both paths hop by hop, with the time and the number of words the spider ate, then offers a **rematch**, a **new pair**, or both paths copied to brag. **Give up** is always there, the race pauses while the tab is hidden, and **Reduce motion** (on by default when the system asks for it) removes the screen shake without making the spider any kinder.
 
 Everything comes live from Wikipedia, with no backend and no API key. Article HTML comes from the REST API (Parsoid output); links, backlinks, page info, random pages and search use the Action API with anonymous CORS (`origin=*`). All of it goes through one queue ([`src/wiki/http.ts`](src/wiki/http.ts)): at most **3 requests in flight**, a cache keyed by URL that also shares in-flight requests, an `Api-User-Agent` header naming the game, and back-off on `429` and `5xx` (`Retry-After` when readable, otherwise 5, 10 and 15 s). The spider never makes you wait: one of the three slots is kept for your page loads, which jump the queue and start **while your cursor rests on a link**, so most clicks open instantly.
 
 Wikipedia's HTML is not shown as it comes. [`src/wiki/sanitize.ts`](src/wiki/sanitize.ts) **rebuilds** each article from an allowlist of tags, attributes and classes instead of deleting what looks dangerous, so no script, style, image, event handler or `id` can get through. References, navboxes, edit links, maintenance templates and figures are dropped. A link stays playable only if it is a `mw:WikiLink` to another main-namespace article that is neither a red link nor the page itself. Every pane keeps a CC BY-SA credit, a link to the source article and one to its history.
 
 <p align="center">
-  <img src="docs/screenshots/race.png" alt="The race screen" width="960" />
+  <img src="SHOWCASE/media/race.png" alt="The race screen" width="960" />
   <br /><sub><em>Three seconds into a Hard race: my page on the left, the spider's on the right with its brain panel already scoring links</em></sub>
 </p>
 
@@ -71,10 +71,19 @@ Wikipedia's HTML is not shown as it comes. [`src/wiki/sanitize.ts`](src/wiki/san
   </thead>
   <tbody>
     <tr>
-      <td><img src="docs/screenshots/title.png" alt="Title screen" width="100%" /></td>
-      <td><img src="docs/screenshots/finish.png" alt="Finish screen" width="100%" /></td>
+      <td><img src="SHOWCASE/media/title.png" alt="Title screen" width="100%" /></td>
+      <td><img src="SHOWCASE/media/finish.png" alt="Finish screen" width="100%" /></td>
     </tr>
   </tbody>
+</table>
+
+**Also in the box**
+
+<table width="100%">
+  <tr>
+    <td width="50%"><img src="SHOWCASE/media/autocomplete.png" alt="Suggestions while typing a page name" width="100%" /><br /><sub><em>Suggestions while you type a page name</em></sub></td>
+    <td width="50%"><img src="SHOWCASE/media/hover-preview.png" alt="Hovering a link" width="100%" /><br /><sub><em>Hovering a link: where it leads, and which hop it would be</em></sub></td>
+  </tr>
 </table>
 
 ---
@@ -96,7 +105,7 @@ The model downloads once and is then cached by the browser, but a race never wai
 All of this happens on screen. While it thinks, the spider shoots **scan rays** from its eye to every visible link, and the `SPIDER.BRAIN` panel lists its top three candidates with their scores. Then it locks on with its eye laser, crawls there, grabs the link and dives: the page glitches out in RGB-split slices and the spider drops into the next article on its thread. The runner ([`src/spider/runner.ts`](src/spider/runner.ts)) prefetches that next page while the spider is still walking.
 
 <p align="center">
-  <img src="docs/screenshots/spider-hop.gif" alt="One hop of the spider" width="960" />
+  <img src="SHOWCASE/media/spider-hop.gif" alt="One hop of the spider" width="960" />
   <br /><sub><em>One hop on the real Spider article: drop in → scan every link → lock on → crawl and eat → grab → dive</em></sub>
 </p>
 
@@ -117,7 +126,7 @@ Long pages needed one more rule. From **1,200 px** away, the spider shoots silk 
 On the way it lasers words in half, plucks one and throws it off the page, or stomps one to pieces. None of it makes the text jump: words are wrapped in spans lazily, only near the spider or under a laser (`WordIndex`), and a destroyed word keeps its box (strike-through, 20 % ink, a dashed hole, embers), so nothing reflows under your cursor.
 
 <p align="center">
-  <img src="docs/screenshots/long-trip.gif" alt="A long trip down the page" width="960" />
+  <img src="SHOWCASE/media/long-trip.gif" alt="A long trip down the page" width="960" />
   <br /><sub><em>Hard, to a link near the end of the Spider article: set off → zip ahead along the way → last stretch on foot → dive</em></sub>
 </p>
 
@@ -144,17 +153,35 @@ Hard adds the dirty tricks. Up to three **decoys**, fake target links planted in
 
 And the **link snatch**: click a link that brings you closer to the target and puts you ahead of the spider, and it leaps across, eats your link, dives in, and the panes **swap owners**, so you carry on from its page. The rules are a pure, tested module ([`src/game/snatch.ts`](src/game/snatch.ts)). "Closer" is the spider's own estimate: 1 hop left from a page that links to the target, 2 from a page that links to one of those, 3 otherwise, with ties broken by semantic similarity. It never strikes on your first three links or on the last two links of a path, and at most once a minute.
 
-Hard is meant as a show, not a fair fight: people should lose, laugh and share the clip. The spider taunts you in speech bubbles (at most one every 6 s), walks to the middle of the screen to eat your badge when it wins, and roasts you on the finish screen with the race's real numbers. Beat it on Hard and it collapses, its eye flickers out, and the finish screen says **IMPOSSIBLE. (screenshot this.)**
+Hard is meant as a show, not a fair fight: people should lose, laugh and share the clip. The spider taunts you in speech bubbles (at most one every 6 s), walks to the middle of the screen to eat your badge when it wins, and roasts you on the finish screen with the race's real numbers. Beat it on Hard and it collapses, its eye flickers out, the finish screen says **IMPOSSIBLE. (screenshot this.)**, and a counter on the title screen keeps your Hard-mode wins (in your browser only, never a made-up global statistic).
 
 <p align="center">
-  <img src="docs/screenshots/fan-laser.gif" alt="The fan laser" width="960" />
+  <img src="SHOWCASE/media/fan-laser.gif" alt="The fan laser" width="960" />
   <br /><sub><em>Hard: the fan laser sweeps my page around the cursor and burns every word and link it crosses</em></sub>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/mini-spiders.gif" alt="Mini-spiders" width="960" />
+  <img src="SHOWCASE/media/mini-spiders.gif" alt="Mini-spiders" width="960" />
   <br /><sub><em>Hard: a fake target link bursts into mini-spiders that break every word they walk on</em></sub>
 </p>
+
+<p align="center">
+  <img src="SHOWCASE/media/link-snatch.gif" alt="The link snatch" width="960" />
+  <br /><sub><em>Hard: my fourth link would put me ahead, so the spider leaps across, eats it, dives in, and we swap pages</em></sub>
+</p>
+
+**Also in the box**
+
+<table width="100%">
+  <tr>
+    <td width="50%"><img src="SHOWCASE/media/web-trap.png" alt="Web trap" width="100%" /><br /><sub><em>Web trap: the links under the web can't be clicked for a few seconds</em></sub></td>
+    <td width="50%"><img src="SHOWCASE/media/word-bombardment.png" alt="Word bombardment" width="100%" /><br /><sub><em>Word bombardment: words from the spider's page cover my links</em></sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="SHOWCASE/media/cursor-harassment.png" alt="Cursor harassment" width="100%" /><br /><sub><em>Cursor harassment: a silk line drags my cursor for 2 s</em></sub></td>
+    <td width="50%"><img src="SHOWCASE/media/impossible.png" alt="Winning on Hard" width="100%" /><br /><sub><em>Beat it on Hard, and the finish screen says so</em></sub></td>
+  </tr>
+</table>
 
 ---
 
@@ -169,7 +196,7 @@ Everything that touches Wikipedia takes a language: the REST and Action API endp
 French also needed its own model. Before switching, I measured: on 5 French targets and 320 candidate titles, the English MiniLM separated relevant links from irrelevant ones with a mean **AUC of 0.91**, the multilingual MiniLM with **0.98**. The price is a 118 MB download instead of 23 MB (cached after the first race) and about 10 s to load instead of 4, which the 8 s grace period and the lexical fallback cover.
 
 <p align="center">
-  <img src="docs/screenshots/french.png" alt="The title screen in French" width="960" />
+  <img src="SHOWCASE/media/french.png" alt="The title screen in French" width="960" />
   <br /><sub><em>The title screen in French: Araignée → Tour Eiffel, raced on fr.wikipedia.org</em></sub>
 </p>
 
@@ -189,7 +216,7 @@ Here's what's holding it all together.
 | **AI** | transformers.js 4.3.1 in a Web Worker, MiniLM sentence embeddings | Runs on the player's machine, with no server and no API bill; a lexical ranker covers the download. |
 | **i18n** | Typed dictionaries (`fr: Strings`) | A missing translation fails the type check. |
 | **Testing** | Vitest + jsdom, a fake Wikipedia | The brain, the route, the rig, the snatch rules and the sanitizer are tested without a network. |
-| **Showcase** | Playwright + ffmpeg ([`scripts/showcase/`](scripts/showcase/)) | One command re-records every GIF and screenshot of this README from the same fake Wikipedia. |
+| **Showcase** | Playwright + ffmpeg ([`SHOWCASE/capture/`](SHOWCASE/capture/)) | One command re-records every GIF and screenshot of this README from the same fake Wikipedia. |
 | **Hosting** | GitHub Pages, deployed by GitHub Actions | A static site; tests and build run on every pull request. |
 
 A few architectural choices worth calling out:
@@ -227,11 +254,15 @@ npm run preview      # serve the production build
 
 No keys and no backend: the game talks to Wikipedia straight from the browser. Or skip all that and **[play it on GitHub Pages](https://huang-frederic.github.io/S.I.L.K/)**.
 
-To re-record the GIFs and screenshots in `docs/screenshots/` (needs ffmpeg, and Chromium for Playwright: `npx playwright install chromium`):
+To re-record the GIFs and screenshots in `SHOWCASE/media/` (needs ffmpeg and Python 3; Playwright stays in its own folder):
 
 ```bash
-npm run showcase                 # every shot
-npm run showcase -- fan-laser    # just one
+npm run build                       # the game, served to the capture from dist/
+cd SHOWCASE/capture
+npm install                         # Playwright, in this folder only
+npx playwright install chromium     # its browser, once
+npm run capture                     # every shot
+npm run capture -- fan-laser        # just one
 ```
 
 ---
@@ -279,7 +310,7 @@ The full catalog, with why each item was deferred and what fixing it would take,
 
 This is a personal project. Source code is provided as-is for portfolio and learning purposes. No license is granted for commercial use or redistribution.
 
-- Article text comes from [English Wikipedia](https://en.wikipedia.org/) and [French Wikipedia](https://fr.wikipedia.org/) under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); every page shown in the game links to its source and its history (authors). The *Spider* article used by the showcase script is stored in [`scripts/showcase/fixtures/`](scripts/showcase/fixtures/) with its attribution.
+- Article text comes from [English Wikipedia](https://en.wikipedia.org/) and [French Wikipedia](https://fr.wikipedia.org/) under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); every page shown in the game links to its source and its history (authors). The *Spider* article used by the showcase script is stored in [`SHOWCASE/capture/fixtures/`](SHOWCASE/capture/fixtures/) with its attribution.
 - [transformers.js](https://github.com/huggingface/transformers.js) (Apache-2.0) and the [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) and [paraphrase-multilingual-MiniLM-L12-v2](https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2) models (Apache-2.0) are loaded at runtime from jsDelivr and Hugging Face.
 - Everything else, including every visual, is original and drawn in code in this repository.
 
