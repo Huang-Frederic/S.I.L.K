@@ -2,7 +2,7 @@
   "name": "silk",
   "private": true,
   "version": "0.1.0",
-  "description": "S.I.L.K (Spider Indexing Links & Knowledge): race an AI web-crawler spider across English Wikipedia.",
+  "description": "S.I.L.K (Spider Indexing Links & Knowledge): race an AI web-crawler spider across English or French Wikipedia.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,11 +11,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "showcase": "npm run build && node --experimental-strip-types scripts/showcase/capture.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
     "jsdom": "^29.1.1",
+    "playwright": "^1.56.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "vitest": "^5.0.3"
