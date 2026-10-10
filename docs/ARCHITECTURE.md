@@ -67,7 +67,10 @@ src/
 tests/                    unit and integration tests, fake Wikipedia + demo world
 scripts/
   generate-icons.mjs      the favicon set in public/, drawn from the rig
-  showcase/               the README's GIFs and screenshots (capture.mjs, make_gif.py)
+SHOWCASE/
+  media/                  the README's GIFs and screenshots
+  capture/                the script that records them (capture.mjs, make_gif.py, fixtures)
+  SHOWCASE.zip            the README and its images, packed for the portfolio
 ```
 
 ---
@@ -301,19 +304,34 @@ back-off; titles and namespaces; settings; taunts and roasts; the panes in jsdom
 
 ## Showcase capture
 
-[`scripts/showcase/capture.mjs`](../scripts/showcase/capture.mjs) regenerates every image in
-`docs/screenshots/` (`npm run showcase`, or `npm run showcase -- <shot>` for one):
+The README is the project's showcase, and everything behind it lives in
+[`SHOWCASE/`](../SHOWCASE/): the images in `SHOWCASE/media/`, the script that
+records them in [`SHOWCASE/capture/`](../SHOWCASE/capture/), and
+`SHOWCASE/SHOWCASE.zip`, the README and its images packed for the portfolio.
 
-- It serves the production build from `dist/` under `/S.I.L.K/` through Playwright's `page.route()`,
-  and answers Wikipedia with the same fake Wikipedia as the tests, plus the real *Spider* article
-  from [`scripts/showcase/fixtures/`](../scripts/showcase/fixtures/). The model download is blocked,
-  so the spider ranks links by word matching, the same way on every run.
-- GIFs are recorded as lossless PNG frames with the DevTools screencast (`Page.startScreencast`),
-  only during the moments worth showing, joined into a lossless video with their real timings, then
-  turned into 960×540 GIFs under 4 MB by [`make_gif.py`](../scripts/showcase/make_gif.py) (ffmpeg
-  two-pass palette, lowering the frame rate and then the colours until the file fits).
-- Attacks are random, so two runs show different attacks; the shots wait for the event they show
-  (a hop, a burn, a decoy) rather than for a fixed time.
+- [`capture.mjs`](../SHOWCASE/capture/capture.mjs) serves the production build
+  from `dist/` under `/S.I.L.K/` through Playwright's `page.route()`, and answers
+  Wikipedia with the same fake Wikipedia as the tests, plus the real *Spider*
+  article from [`SHOWCASE/capture/fixtures/`](../SHOWCASE/capture/fixtures/).
+  The model download is blocked, so the spider ranks links by word matching.
+- GIFs are recorded as lossless PNG frames with the DevTools screencast
+  (`Page.startScreencast`), only during the moments worth showing, joined into a
+  lossless video with their real timings, then turned into 960×540 GIFs by
+  [`make_gif.py`](../SHOWCASE/capture/make_gif.py) (ffmpeg two-pass palette,
+  lowering the frame rate and then the colours until the file fits its budget).
+- Attacks are random, so two runs show different attacks; the shots wait for the
+  event they show (a hop, a burn, a web, a decoy, a snatch) rather than for a
+  fixed time.
+- Playwright is a dependency of `SHOWCASE/capture/package.json` only: the game's
+  own dependencies do not include it.
+
+```bash
+npm run build                      # the game, at the root
+cd SHOWCASE/capture
+npm install                        # once: Playwright, in this folder only
+npx playwright install chromium    # once: its browser
+npm run capture                    # every shot, or: npm run capture -- <shot>
+```
 
 ---
 
@@ -328,7 +346,6 @@ npm test           # unit tests (Vitest + jsdom, Wikipedia mocked)
 npm run build      # type-check + production build into dist/
 npm run preview    # serve the production build
 npm run icons      # regenerate the favicon set in public/ (scripts/generate-icons.mjs)
-npm run showcase   # re-record docs/screenshots/ (Playwright + ffmpeg)
 ```
 
 The app is served under `/S.I.L.K/` (Vite `base`), matching the GitHub Pages URL.

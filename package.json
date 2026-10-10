@@ -11,13 +11,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "icons": "node scripts/generate-icons.mjs",
-    "showcase": "npm run build && node --experimental-strip-types scripts/showcase/capture.mjs"
+    "icons": "node scripts/generate-icons.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
     "jsdom": "^29.1.1",
-    "playwright": "^1.56.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "vitest": "^5.0.3"
