@@ -20,18 +20,18 @@ describe('RacerPane', () => {
   it('follows its owner: badge, colours, back button, clickability', () => {
     const pane = new RacerPane('player', 'left');
     expect(pane.element.classList.contains('is-player')).toBe(true);
-    // French by default.
-    expect(pane.badgeElement.textContent).toBe('TOI');
+    // English by default.
+    expect(pane.badgeElement.textContent).toBe('YOU');
     expect(pane.scroller.inert).toBe(false);
 
     pane.setOwner('spider');
     expect(pane.element.classList.contains('is-spider')).toBe(true);
     expect(pane.element.classList.contains('is-player')).toBe(false);
-    expect(pane.badgeElement.textContent).toBe('ARAIGNÉE');
-    setLang('en');
-    pane.setOwner('spider');
     expect(pane.badgeElement.textContent).toBe('SPIDER');
     setLang('fr');
+    pane.setOwner('spider');
+    expect(pane.badgeElement.textContent).toBe('ARAIGNÉE');
+    setLang('en');
     expect(pane.scroller.inert).toBe(true);
     expect(pane.element.querySelector<HTMLElement>('.pane-back')!.hidden).toBe(true);
     expect(pane.element.querySelector<HTMLElement>('.brain')!.hidden).toBe(false);

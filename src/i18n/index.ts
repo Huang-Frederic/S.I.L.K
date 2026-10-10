@@ -1,7 +1,7 @@
 /**
  * The game's languages. The language picks both the texts of the game and
  * the Wikipedia the race is run on (fr.wikipedia.org or en.wikipedia.org).
- * French is the default.
+ * English is the default.
  */
 import { en, type Strings } from './en';
 import { fr } from './fr';
@@ -9,8 +9,8 @@ import { fr } from './fr';
 export type Lang = 'fr' | 'en';
 export type { Strings };
 
-export const LANGS: readonly Lang[] = ['fr', 'en'];
-export const DEFAULT_LANG: Lang = 'fr';
+export const LANGS: readonly Lang[] = ['en', 'fr'];
+export const DEFAULT_LANG: Lang = 'en';
 
 const STRINGS: Record<Lang, Strings> = { fr, en };
 
