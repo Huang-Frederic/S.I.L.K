@@ -7,8 +7,9 @@
  *   node --experimental-strip-types scripts/showcase/capture.mjs title logo   only these
  *
  * Needs Playwright (`npm i -D playwright` and `npx playwright install chromium`),
- * ffmpeg and python3 (for make_gif.py, which sits next to this file). Node 22.6+
- * (the fake Wikipedia from tests/helpers/ is TypeScript, run as is).
+ * ffmpeg, Python 3 for make_gif.py, which sits next to this file (`python3`, or
+ * `python` on Windows, or the PYTHON environment variable), and Node 22.6+ (the
+ * fake Wikipedia from tests/helpers/ is TypeScript, run as is).
  *
  * Everything is offline and plays on the same pages every time: the production
  * build is served from dist/, Wikipedia is the fake demo world of the tests plus
@@ -35,6 +36,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../..');
 const OUT = join(ROOT, 'docs/screenshots');
 const MAKE_GIF = join(HERE, 'make_gif.py');
+const PYTHON = process.env.PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3');
 const DESKTOP = { width: 1920, height: 1080 };
 
 // ─── 1. How to reach the app ────────────────────────────────────────────────
@@ -385,7 +387,7 @@ async function capture(browser, name, shot) {
       const args = [MAKE_GIF, clip.toVideo(), join(OUT, `${name}.gif`), '--fps', String(shot.gif.fps ?? 12), '--speed', String(shot.gif.speed ?? 1)];
       if (crop) args.push('--crop', crop);
       if (shot.gif.pad) args.push('--pad', shot.gif.pad);
-      execFileSync('python3', args, { stdio: 'inherit' });
+      execFileSync(PYTHON, args, { stdio: 'inherit' });
     } else {
       // run() may return a locator to capture just that element.
       const target = await shot.run({ page });
